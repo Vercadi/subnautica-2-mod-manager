@@ -10,14 +10,8 @@ ASSETS = ROOT / "assets"
 ICON = ASSETS / "app.ico"
 
 datas = [
-    (str(ASSETS), "assets"),
-    (str(ROOT / "docs"), "docs"),
-    (str(ROOT / "README.md"), "."),
-    (str(ROOT / "PACKAGING.md"), "."),
-    (str(ROOT / "PRIVACY.md"), "."),
-    (str(ROOT / "CHANGELOG.md"), "."),
-    (str(ROOT / "LICENSE"), "."),
-    (str(ROOT / "release-metadata.json"), "."),
+    (str(ASSETS / "app.ico"), "assets"),
+    (str(ASSETS / "app_icon.png"), "assets"),
 ]
 datas += collect_data_files("tkinterdnd2")
 

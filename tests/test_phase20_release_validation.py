@@ -30,7 +30,7 @@ def test_release_docs_include_antivirus_and_support_guidance() -> None:
     assert "administrator rights" in nexus
     assert "Support Report Workflow" in nexus
     assert "unsigned PyInstaller bundle" in packaging
-    assert "docs\\release-checklist.md" in packaging
+    assert "README.md" in packaging
 
 
 def test_portable_dist_contains_required_release_files_when_built() -> None:
@@ -48,16 +48,11 @@ def test_portable_dist_contains_required_release_files_when_built() -> None:
     required = [
         "Subnautica2ModManager.exe",
         "README.md",
-        "CHANGELOG.md",
         "LICENSE",
         "PRIVACY.md",
-        "PACKAGING.md",
         "release-metadata.json",
-        "assets/app.ico",
-        "assets/app_icon.png",
-        "docs/nexus-release-guide.md",
-        "docs/release-checklist.md",
-        "docs/phase20-clean-release-validation.md",
+        "_internal/assets/app.ico",
+        "_internal/assets/app_icon.png",
     ]
     for relative in required:
         assert (dist / relative).is_file(), relative
@@ -69,6 +64,7 @@ def test_build_script_copies_docs_and_release_metadata() -> None:
     root = Path(__file__).resolve().parents[1]
     script = (root / "scripts" / "build_portable.ps1").read_text(encoding="utf-8")
 
-    assert 'Copy-Item -LiteralPath ".\\docs"' in script
+    assert ".\\README.md" in script
     assert "release-metadata.json" in script
     assert "write_release_metadata" in script
+    assert "Copy-Item -LiteralPath \".\\assets\"" not in script

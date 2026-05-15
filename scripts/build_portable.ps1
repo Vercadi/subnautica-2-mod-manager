@@ -20,7 +20,5 @@ if (-not (Test-Path $Dist)) {
     throw "Expected portable dist folder was not created: $Dist"
 }
 
-Copy-Item -LiteralPath ".\README.md", ".\PACKAGING.md", ".\PRIVACY.md", ".\CHANGELOG.md", ".\LICENSE", ".\release-metadata.json" -Destination $Dist -Force
-Copy-Item -LiteralPath ".\assets" -Destination $Dist -Recurse -Force
-Copy-Item -LiteralPath ".\docs" -Destination $Dist -Recurse -Force
+Copy-Item -LiteralPath ".\README.md", ".\PRIVACY.md", ".\LICENSE", ".\release-metadata.json" -Destination $Dist -Force
 Write-Host "Portable build ready: $Dist"

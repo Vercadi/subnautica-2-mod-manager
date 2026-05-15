@@ -22,12 +22,9 @@ dist/
   Subnautica2ModManager/
     Subnautica2ModManager.exe
     _internal/
-    assets/
     README.md
-    PACKAGING.md
+    LICENSE
     PRIVACY.md
-    CHANGELOG.md
-    docs/
     release-metadata.json
 ```
 
@@ -68,7 +65,7 @@ Deleting manager state does not delete game saves. Unknown files in the game ins
 
 Real apply and destructive recovery actions are disabled for real detected Subnautica 2 installs by default. Test execution is only exposed for fake installs marked with `.s2mm_fake_install`.
 
-Loose root overlays such as `dxgi.dll` plus root `.ini` files are review-required and blocked from automatic apply until explicit target policies exist. See `docs\nexus-release-guide.md` for the user-facing support and safety wording bundled with the portable build.
+Loose root overlays such as `dxgi.dll` plus root `.ini` files are review-required and blocked from automatic apply until explicit target policies exist. The public Nexus page and `README.md` carry the user-facing support and safety wording.
 
 ## Windows Security Note
 

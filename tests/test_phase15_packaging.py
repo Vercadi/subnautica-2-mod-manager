@@ -99,7 +99,7 @@ def test_pyinstaller_spec_and_build_script_include_assets_and_metadata() -> None
 
     assert "assets" in spec
     assert "tkinterdnd2" in spec
-    assert "release-metadata.json" in spec
+    assert "release-metadata.json" in script
     assert "write_release_metadata" in script
     assert "PyInstaller" in script
 

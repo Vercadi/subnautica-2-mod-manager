@@ -8,8 +8,8 @@ Run these checks before uploading a public portable build.
 - Run `.\scripts\build_portable.ps1 -Clean`.
 - Confirm `dist\Subnautica2ModManager\Subnautica2ModManager.exe` exists.
 - Confirm `release-metadata.json` version matches the intended release.
-- Confirm top-level package files exist: `README.md`, `CHANGELOG.md`, `PRIVACY.md`, `PACKAGING.md`, `docs\`, and `assets\`.
-- Confirm `assets\app.ico` and `assets\app_icon.png` are included.
+- Confirm top-level package files exist: `README.md`, `LICENSE`, `PRIVACY.md`, and `release-metadata.json`.
+- Confirm `_internal\assets\app.ico` and `_internal\assets\app_icon.png` are included.
 
 ## Clean Launch
 
@@ -41,7 +41,7 @@ Run these checks before uploading a public portable build.
 ## Nexus Upload
 
 - Zip the `dist\Subnautica2ModManager` folder contents as the portable release.
-- Include concise release notes from `CHANGELOG.md`.
+- Include concise release notes from `docs\release-notes-v0.1.0.md` or the current release notes file.
 - Include the safety limitations: Apply Preview required, manifest-tracked recovery only, loose root overlays review-required.
 - Include the Windows security note: unsigned PyInstaller builds can trigger heuristic antivirus detections and the app does not require administrator rights.
 - Add screenshots of the main shell, Settings, Help/About, Import Review, Apply Preview, and Recovery if available.
@@ -55,4 +55,4 @@ After `.\scripts\build_portable.ps1 -Clean` and `.\scripts\package_release.ps1`,
 - Portable exe: `dist\Subnautica2ModManager\Subnautica2ModManager.exe`
 - Screenshot folder: `screenshots`
 
-Do not hard-code package hashes in this bundled checklist; `SHA256SUMS.txt` is the source of truth because the checklist is included inside the zip.
+Do not hard-code package hashes in this checklist; `SHA256SUMS.txt` is the source of truth.

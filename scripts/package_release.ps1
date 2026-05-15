@@ -24,16 +24,9 @@ if ([string]::IsNullOrWhiteSpace($Version)) {
 $required = @(
     "Subnautica2ModManager.exe",
     "README.md",
-    "CHANGELOG.md",
     "LICENSE",
     "PRIVACY.md",
-    "PACKAGING.md",
-    "release-metadata.json",
-    "assets\app.ico",
-    "assets\app_icon.png",
-    "docs\nexus-release-guide.md",
-    "docs\release-checklist.md",
-    "docs\release-notes-v0.1.0.md"
+    "release-metadata.json"
 )
 
 foreach ($relative in $required) {

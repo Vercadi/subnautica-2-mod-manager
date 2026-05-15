@@ -32,8 +32,8 @@ def test_package_release_script_generates_zip_and_hashes() -> None:
     assert "Get-FileHash" in script
     assert "SHA256SUMS.txt" in script
     assert "release-metadata.json" in script
-    assert "release-notes-v0.1.0.md" in script
     assert "forbidden local/build content" in script
+    assert "docs\\release-notes-v0.1.0.md" not in script
 
 
 def _latest_release_zip() -> Path | None:
@@ -61,16 +61,11 @@ def test_release_zip_contents_are_clean_when_built() -> None:
         required = {
             "Subnautica2ModManager/Subnautica2ModManager.exe",
             "Subnautica2ModManager/README.md",
-            "Subnautica2ModManager/CHANGELOG.md",
             "Subnautica2ModManager/LICENSE",
             "Subnautica2ModManager/PRIVACY.md",
-            "Subnautica2ModManager/PACKAGING.md",
             "Subnautica2ModManager/release-metadata.json",
-            "Subnautica2ModManager/assets/app.ico",
-            "Subnautica2ModManager/assets/app_icon.png",
-            "Subnautica2ModManager/docs/nexus-release-guide.md",
-            "Subnautica2ModManager/docs/release-checklist.md",
-            "Subnautica2ModManager/docs/release-notes-v0.1.0.md",
+            "Subnautica2ModManager/_internal/assets/app.ico",
+            "Subnautica2ModManager/_internal/assets/app_icon.png",
         }
         assert required.issubset(set(names))
 
