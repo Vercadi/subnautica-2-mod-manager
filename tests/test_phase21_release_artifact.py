@@ -62,6 +62,7 @@ def test_release_zip_contents_are_clean_when_built() -> None:
             "Subnautica2ModManager/Subnautica2ModManager.exe",
             "Subnautica2ModManager/README.md",
             "Subnautica2ModManager/CHANGELOG.md",
+            "Subnautica2ModManager/LICENSE",
             "Subnautica2ModManager/PRIVACY.md",
             "Subnautica2ModManager/PACKAGING.md",
             "Subnautica2ModManager/release-metadata.json",

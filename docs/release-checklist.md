@@ -46,11 +46,11 @@ Run these checks before uploading a public portable build.
 - Include the Windows security note: unsigned PyInstaller builds can trigger heuristic antivirus detections and the app does not require administrator rights.
 - Add screenshots of the main shell, Settings, Help/About, Import Review, Apply Preview, and Recovery if available.
 
-## Current RC Artifact
+## Current Artifact
 
 After `.\scripts\build_portable.ps1 -Clean` and `.\scripts\package_release.ps1`, upload the zip from:
 
-- Release zip: `dist\release\Subnautica2ModManager-0.1.0-rc1-portable.zip`
+- Release zip: `dist\release\Subnautica2ModManager-0.1.0-portable.zip`
 - SHA256 sums: `dist\release\SHA256SUMS.txt`
 - Portable exe: `dist\Subnautica2ModManager\Subnautica2ModManager.exe`
 - Screenshot folder: `screenshots`

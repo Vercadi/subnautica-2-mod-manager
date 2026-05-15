@@ -1,6 +1,6 @@
 {
   "app_name": "Subnautica 2 Mod Manager",
-  "generated_at": "2026-05-15T14:39:46+00:00",
+  "generated_at": "2026-05-15T15:39:54+00:00",
   "package_kind": "portable-pyinstaller",
   "platform": "Windows-10-10.0.19045-SP0",
   "python": "3.13.7",
@@ -10,5 +10,5 @@
     "real_apply": "enabled_for_non_blocked_apply_preview_plans",
     "restore_vanilla": "preview_only"
   },
-  "version": "0.1.0-rc1"
+  "version": "0.1.0"
 }

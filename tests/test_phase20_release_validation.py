@@ -49,6 +49,7 @@ def test_portable_dist_contains_required_release_files_when_built() -> None:
         "Subnautica2ModManager.exe",
         "README.md",
         "CHANGELOG.md",
+        "LICENSE",
         "PRIVACY.md",
         "PACKAGING.md",
         "release-metadata.json",

@@ -1,48 +1,58 @@
-# Subnautica 2 Mod Manager v0.1.0 RC1
+# Subnautica 2 Mod Manager v0.1.0
 
-First Nexus release candidate for the Subnautica 2 Mod Manager portable Windows build.
+Initial public portable Windows release.
 
-## Safety Notes
+## Highlights
 
-- Real apply for supported managed mods is available through Apply Preview for the detected Subnautica 2 install.
-- Apply Preview refuses blocked/review-required plans before any game-folder write.
-- Destructive recovery is limited to managed uninstall/restore actions for files recorded in `install_manifest.json`.
-- Fake installs marked with `.s2mm_fake_install` can still be used for test-only validation.
-- Restore-vanilla and quarantine flows are preview/report surfaces only.
-- The app does not delete saves and recovery uses only its own install manifest.
+- Import UE4SS and pak mods from files, folders, `.zip`, and `.7z`.
+- Organize imported mods into profiles.
+- Enable or disable profile entries.
+- Preview every planned install action before writing to the game folder.
+- Apply supported managed mods after confirmation.
+- Track installed files in `install_manifest.json`.
+- Uninstall managed files later through Recovery / Backups.
+- Generate diagnostics and redacted support reports.
 
 ## Supported Mod Shapes
 
-- Pak bundles: `.pak` with optional `.ucas` and `.utoc` companions.
-- UE4SS runtime archives/folders targeting `Subnautica2\Binaries\Win64`.
-- UE4SS Lua/C++ mods under `ue4ss\Mods\<ModName>`.
-- Wrapped UE4SS mod folders with `Scripts\main.lua` or `DLLs\main.dll`.
-- UE4SS activation-file preview/apply for `enabled.txt`, `mods.txt`, and `mods.json` through the guarded profile apply flow.
-- Archives: `.zip`, `.7z`, and `.rar` when local RAR support is available.
-- Direct folders and selected loose pak companion files through Browse or Drop Zone.
+- Pak bundles with `.pak`, `.ucas`, and `.utoc` companions.
+- UE4SS runtime archives/folders.
+- UE4SS Lua mods using `Scripts\main.lua`.
+- UE4SS C++ mods using `dlls\main.dll`.
+- Wrapped UE4SS mod folders.
+- Zip and 7z archives.
+- Direct folders containing supported mod structures.
 
 ## Review-Required Shapes
 
-- Loose game-root overlays such as `dxgi.dll`, root `.ini` files, loader DLLs, or arbitrary unmanaged files.
-- SN2P-style root overlays remain blocked from automatic apply until a dedicated safe policy is implemented.
-- Ambiguous multi-component archives may need manual review before being added to a profile.
+- Loose game-root overlays.
+- SN2P-style root overlays.
+- Root loader DLLs or root `.ini` files.
+- Ambiguous archives containing multiple unrelated mod candidates.
+- Unsupported archive/file layouts.
+
+Review-required items are blocked from automatic apply. They can be imported for reference, but they need manual review before use.
+
+## Safety Notes
+
+- Real apply for supported managed mods is available through Apply Preview.
+- Apply Preview refuses blocked or review-required plans before any game-folder write.
+- Destructive recovery is limited to manifest-tracked managed files.
+- Unknown files are reported, not deleted.
+- Saves are not deleted by the manager.
+- Restore-vanilla and quarantine are preview/report surfaces only.
 
 ## Known Limitations
 
-- No automatic download/install for updates; update checks only report GitHub release availability.
-- No Nexus metadata parsing, dependency resolution, or one-click Nexus integration yet.
-- UE4SS activation-file writes remain guarded by Apply Preview, backups, and manifests.
-- No migration UI for moving an existing manager data/library/backups folder.
+- No per-mod UE4SS settings editor yet.
+- No Nexus metadata parsing or one-click Nexus download integration.
+- Manually installed mods cannot be safely uninstalled unless this manager installed them.
+- RAR support depends on local archive support.
+- SN2P-style root overlays remain review-required.
 
 ## Support Report
 
-Use Help / About / Support, then copy or save the local support report. Include:
-
-- The report text.
-- The mod filename or archive name.
-- The active profile name.
-- The action clicked.
-- The visible warning or error text.
+Use Help / About / Support, then copy or save the local support report. Include the report text, mod filename, active profile, action clicked, and visible warning or error.
 
 Support reports redact user-home paths. Do not include saves, personal account folders, or unrelated logs.
 

@@ -25,6 +25,7 @@ $required = @(
     "Subnautica2ModManager.exe",
     "README.md",
     "CHANGELOG.md",
+    "LICENSE",
     "PRIVACY.md",
     "PACKAGING.md",
     "release-metadata.json",

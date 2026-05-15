@@ -16,6 +16,7 @@ datas = [
     (str(ROOT / "PACKAGING.md"), "."),
     (str(ROOT / "PRIVACY.md"), "."),
     (str(ROOT / "CHANGELOG.md"), "."),
+    (str(ROOT / "LICENSE"), "."),
     (str(ROOT / "release-metadata.json"), "."),
 ]
 datas += collect_data_files("tkinterdnd2")
