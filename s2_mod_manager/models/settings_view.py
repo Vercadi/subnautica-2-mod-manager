@@ -43,7 +43,7 @@ class SettingsView:
     ue4ss_target_dir: Path | None = None
     gamepass_experimental: bool = False
     archive_support: dict[str, bool] = field(default_factory=dict)
-    auto_check_updates: bool = False
+    auto_check_updates: bool = True
     show_update_popups: bool = True
     show_info_popups: bool = True
     show_success_popups: bool = True

@@ -42,7 +42,7 @@ def popup_policy_from_text(value: str) -> str:
 
 @dataclass(frozen=True)
 class UserPreferences:
-    auto_check_updates: bool = False
+    auto_check_updates: bool = True
     show_update_popups: bool = True
     show_info_popups: bool = True
     show_success_popups: bool = True
@@ -69,7 +69,7 @@ class UserPreferences:
         if not isinstance(data, dict):
             return cls()
         return cls(
-            auto_check_updates=bool(data.get("auto_check_updates", False)),
+            auto_check_updates=bool(data.get("auto_check_updates", True)),
             show_update_popups=bool(data.get("show_update_popups", True)),
             show_info_popups=bool(data.get("show_info_popups", True)),
             show_success_popups=bool(data.get("show_success_popups", True)),

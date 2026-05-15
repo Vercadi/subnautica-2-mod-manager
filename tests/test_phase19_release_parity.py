@@ -76,12 +76,12 @@ def test_update_checker_parses_versions_assets_and_errors() -> None:
     assert "No GitHub release" in friendly_error(urllib.error.HTTPError("x", 404, "missing", None, None))
 
 
-def test_update_preference_defaults_off_and_roundtrips_with_paths(tmp_path: Path) -> None:
+def test_update_preference_defaults_on_and_roundtrips_with_paths(tmp_path: Path) -> None:
     settings = tmp_path / "settings.json"
     paths = S2AppPaths(client_root=tmp_path / "Subnautica2")
     save_settings(settings, paths)
 
-    assert load_preferences(settings).auto_check_updates is False
+    assert load_preferences(settings).auto_check_updates is True
 
     prefs = update_auto_check_updates(settings, True)
     view = build_settings_view(

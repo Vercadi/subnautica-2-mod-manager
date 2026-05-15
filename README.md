@@ -96,7 +96,7 @@ The release zip is written to `dist\release`.
 - [PRIVACY.md](PRIVACY.md) - local data and support-report privacy
 - [CHANGELOG.md](CHANGELOG.md) - release changes
 - [docs/nexus-release-guide.md](docs/nexus-release-guide.md) - Nexus-facing user guide
-- [docs/release-notes-v0.1.1.md](docs/release-notes-v0.1.1.md) - current release notes
+- [docs/release-notes-v0.1.2.md](docs/release-notes-v0.1.2.md) - current release notes
 - [docs/release-checklist.md](docs/release-checklist.md) - final manual release checks
 
 ## Project Layout

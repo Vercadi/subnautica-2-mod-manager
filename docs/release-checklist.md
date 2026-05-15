@@ -42,7 +42,7 @@ Run these checks before uploading a public portable build.
 ## Nexus Upload
 
 - Zip the `dist\Subnautica2ModManager` folder contents as the portable release.
-- Include concise release notes from `docs\release-notes-v0.1.1.md` or the current release notes file.
+- Include concise release notes from `docs\release-notes-v0.1.2.md` or the current release notes file.
 - Include the safety limitations: Preview & Apply required, manifest-tracked recovery only, loose root overlays review-required.
 - Include the Windows security note: unsigned PyInstaller builds can trigger heuristic antivirus detections and the app does not require administrator rights.
 - Add screenshots of the main shell, Settings, Help/About, Import Review, Preview & Apply, and Recovery if available.
@@ -51,11 +51,11 @@ Run these checks before uploading a public portable build.
 
 After `.\scripts\build_portable.ps1 -Clean` and `.\scripts\package_release.ps1`, upload the zip from:
 
-- Release zip: `dist\release\Subnautica2ModManager-0.1.1-portable.zip`
+- Release zip: `dist\release\Subnautica2ModManager-0.1.2-portable.zip`
 - SHA256 sums: `dist\release\SHA256SUMS.txt`
 - Portable exe: `dist\Subnautica2ModManager\Subnautica2ModManager.exe`
 - Screenshot folder: `screenshots`
-- Current exe SHA256: `db23e7b0a24c23c3613b7e5b29c6e6b3d49b7e0c5d4219259535082ab421792c`
-- Current zip SHA256: `9d4a6c5b9b62686106922a11fd9b656d7d7d46bfe3dcd41931053612ad5b995a`
+- Current exe SHA256: `2d488e090421f81a6738023149f9916259943df8a332cd3def11160583bffe2a`
+- Current zip SHA256: `eb45cc6537fe0deb23a610b7bf8de89d59ba7df4e4908b9959e83c7c0945ae7f`
 
 Regenerate these hashes after any rebuild; `SHA256SUMS.txt` is the source of truth.

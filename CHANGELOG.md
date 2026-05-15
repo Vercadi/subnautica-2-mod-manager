@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.1.2
+
+Patch release for update visibility.
+
+Changed:
+
+- Startup update checks now default to enabled for new installs and missing/corrupt settings.
+- Existing users who already saved an update-check preference keep their current choice.
+- Update checks still only query GitHub Releases; the app does not auto-download or auto-install updates.
+
 ## 0.1.1
 
 Patch release focused on non-Steam install layouts.
