@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+env/
+
+# Local app/runtime data
+data/
+backups/
+logs/
+tmp/
+quarantine/
+crash_reports/
+
+# Build outputs
+build/
+dist/
+*.egg-info/
+
+# Local mod inbox lives beside this repo at ..\Mods
+# Do not create a second in-repo Mods folder unless the layout changes.
+Mods/
+*.log
+
+# OS/editor noise
+Thumbs.db
+Desktop.ini
+.DS_Store
+.idea/
+.vscode/
