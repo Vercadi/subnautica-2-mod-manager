@@ -16,6 +16,7 @@ Run these checks before uploading a public portable build.
 - Launch the portable exe from a folder outside the repo and outside the game install.
 - Confirm first-run creates manager data, logs, library, backups, settings, profiles, and activity log.
 - Confirm Settings opens centered and shows the detected S2 install/build state.
+- Confirm Settings shows the install variant, project folder, binaries folder, pak folder, and any Game Pass experimental warning.
 - Confirm Help / About / Support opens centered, can copy/save a support report, and shows folder shortcuts.
 - Confirm Activity / Recent Events opens centered and shows startup/settings events.
 - Confirm Recovery opens centered and only manifest-tracked managed uninstall actions are available.
@@ -25,7 +26,7 @@ Run these checks before uploading a public portable build.
 - Scan/import the real sample `..\Mods` inbox.
 - Confirm pak bundles, UE4SS runtime, UE4SS mods, and review-required loose overlays classify correctly.
 - Create a non-Vanilla profile and add safe deployable components.
-- Open Apply Preview and confirm exact targets, blocked state, warnings, and Apply Profile availability for safe managed plans.
+- Open Preview & Apply Profile and confirm exact targets, blocked state, warnings, and Apply Profile availability for safe managed plans.
 - Verify `SN2P`-style loose root overlays remain blocked and actionable.
 - Apply a small safe managed profile to the real install only after confirming backups/manifest state, then uninstall it from Recovery and verify only managed files changed.
 
@@ -41,18 +42,20 @@ Run these checks before uploading a public portable build.
 ## Nexus Upload
 
 - Zip the `dist\Subnautica2ModManager` folder contents as the portable release.
-- Include concise release notes from `docs\release-notes-v0.1.0.md` or the current release notes file.
-- Include the safety limitations: Apply Preview required, manifest-tracked recovery only, loose root overlays review-required.
+- Include concise release notes from `docs\release-notes-v0.1.1.md` or the current release notes file.
+- Include the safety limitations: Preview & Apply required, manifest-tracked recovery only, loose root overlays review-required.
 - Include the Windows security note: unsigned PyInstaller builds can trigger heuristic antivirus detections and the app does not require administrator rights.
-- Add screenshots of the main shell, Settings, Help/About, Import Review, Apply Preview, and Recovery if available.
+- Add screenshots of the main shell, Settings, Help/About, Import Review, Preview & Apply, and Recovery if available.
 
 ## Current Artifact
 
 After `.\scripts\build_portable.ps1 -Clean` and `.\scripts\package_release.ps1`, upload the zip from:
 
-- Release zip: `dist\release\Subnautica2ModManager-0.1.0-portable.zip`
+- Release zip: `dist\release\Subnautica2ModManager-0.1.1-portable.zip`
 - SHA256 sums: `dist\release\SHA256SUMS.txt`
 - Portable exe: `dist\Subnautica2ModManager\Subnautica2ModManager.exe`
 - Screenshot folder: `screenshots`
+- Current exe SHA256: `db23e7b0a24c23c3613b7e5b29c6e6b3d49b7e0c5d4219259535082ab421792c`
+- Current zip SHA256: `9d4a6c5b9b62686106922a11fd9b656d7d7d46bfe3dcd41931053612ad5b995a`
 
-Do not hard-code package hashes in this checklist; `SHA256SUMS.txt` is the source of truth.
+Regenerate these hashes after any rebuild; `SHA256SUMS.txt` is the source of truth.

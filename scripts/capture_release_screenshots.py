@@ -86,7 +86,7 @@ def _first_sample_source() -> Path | None:
 def _prepare_console(app: AppWindow) -> None:
     app.status_log.clear()
     app._console_write("Release candidate visual QA.")
-    app._console_write("Safety gates active: Apply Preview installs managed files only; loose overlays remain blocked.")
+    app._console_write("Safety gates active: Preview & Apply installs managed files only; loose overlays remain blocked.")
     app._console_write("Loose root overlays remain review-required and blocked from automatic apply.")
 
 

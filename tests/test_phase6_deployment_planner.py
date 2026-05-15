@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from s2_mod_manager.core.deployment_planner import build_deployment_plan
+from s2_mod_manager.core.discovery import normalize_install_path
 from s2_mod_manager.models.app_paths import S2AppPaths
 from s2_mod_manager.models.archive_info import (
     COMPONENT_LOOSE_OVERLAY,
@@ -41,6 +42,89 @@ def test_target_mapping_for_pak_runtime_and_ue4ss_mod(tmp_path: Path) -> None:
     assert targets["pak"] == paths.mods_paks / "Mod_P.pak"
     assert targets["runtime"] == paths.win64 / "UE4SS.dll"
     assert targets["ue4ss"] == paths.ue4ss_mods / "Hud" / "Scripts" / "main.lua"
+    assert not plan.errors
+
+
+def test_gamepass_layout_maps_runtime_to_content_and_ue4ss_mods_to_wingdk_targets(tmp_path: Path) -> None:
+    paths = _gamepass_paths(tmp_path)
+    source = _source(tmp_path, files=["Mod/Mod_P.pak", "ue4ss/UE4SS.dll", "dwmapi.dll", "Hud/Scripts/main.lua"])
+    components = [
+        _component("pak", "Pak Mod", source.source_id, COMPONENT_PAK_BUNDLE, INSTALL_KIND_STANDARD, [
+            _file("Mod/Mod_P.pak", "Mod_P.pak"),
+        ]),
+        _component("runtime", "Runtime", source.source_id, COMPONENT_UE4SS_RUNTIME, INSTALL_KIND_UE4SS_RUNTIME, [
+            _file("ue4ss/UE4SS.dll", "ue4ss/UE4SS.dll"),
+            _file("dwmapi.dll", "dwmapi.dll"),
+        ]),
+        _component("ue4ss", "HUD", source.source_id, COMPONENT_UE4SS_MOD, INSTALL_KIND_UE4SS_MOD, [
+            _file("Hud/Scripts/main.lua", "Hud/Scripts/main.lua"),
+        ]),
+    ]
+
+    plan = build_deployment_plan(_profile([component.component_id for component in components]), sources=[source], components=components, paths=paths)
+    targets = {action.component_id: action.target_path for action in plan.actions}
+
+    assert targets["pak"] == paths.content_paks / "~mods" / "Mod_P.pak"
+    runtime_targets = {action.target_path for action in plan.actions if action.component_id == "runtime"}
+    assert runtime_targets == {
+        paths.gamepass_content_root / "ue4ss" / "UE4SS.dll",
+        paths.gamepass_content_root / "dwmapi.dll",
+    }
+    assert targets["ue4ss"] == paths.binaries_dir / "ue4ss" / "Mods" / "Hud" / "Scripts" / "main.lua"
+    assert "WinGDK" in str(targets["ue4ss"])
+    assert any("experimental" in warning.casefold() for warning in plan.warnings)
+
+
+def test_gamepass_explicit_wingdk_runtime_target_is_preserved(tmp_path: Path) -> None:
+    paths = _gamepass_paths(tmp_path)
+    source = _source(
+        tmp_path,
+        files=[
+            "Content/Subnautica2/Binaries/WinGDK/ue4ss/UE4SS.dll",
+            "Content/Subnautica2/Binaries/WinGDK/dwmapi.dll",
+        ],
+    )
+    component = _component(
+        "runtime",
+        "Game Pass Runtime",
+        source.source_id,
+        COMPONENT_UE4SS_RUNTIME,
+        INSTALL_KIND_UE4SS_RUNTIME,
+        [
+            _file(
+                "Content/Subnautica2/Binaries/WinGDK/ue4ss/UE4SS.dll",
+                "Subnautica2/Binaries/WinGDK/ue4ss/UE4SS.dll",
+            ),
+            _file(
+                "Content/Subnautica2/Binaries/WinGDK/dwmapi.dll",
+                "Subnautica2/Binaries/WinGDK/dwmapi.dll",
+            ),
+        ],
+    )
+
+    plan = build_deployment_plan(_profile([component.component_id]), sources=[source], components=[component], paths=paths)
+
+    assert {action.target_path for action in plan.actions} == {
+        paths.gamepass_content_root / "Subnautica2" / "Binaries" / "WinGDK" / "ue4ss" / "UE4SS.dll",
+        paths.gamepass_content_root / "Subnautica2" / "Binaries" / "WinGDK" / "dwmapi.dll",
+    }
+
+
+def test_logicmods_pak_bundle_maps_under_content_paks_logicmods(tmp_path: Path) -> None:
+    paths = _paths(tmp_path)
+    source = _source(tmp_path, files=["SeaSprint/SeaSprint.pak", "SeaSprint/SeaSprint.ucas"])
+    component = _component("logic", "SeaSprint", source.source_id, COMPONENT_PAK_BUNDLE, INSTALL_KIND_STANDARD, [
+        _file("SeaSprint/SeaSprint.pak", "LogicMods/SeaSprint.pak"),
+        _file("SeaSprint/SeaSprint.ucas", "LogicMods/SeaSprint.ucas"),
+    ])
+
+    plan = build_deployment_plan(_profile(["logic"]), sources=[source], components=[component], paths=paths)
+    targets = sorted(action.target_path for action in plan.actions)
+
+    assert targets == [
+        paths.content_paks / "LogicMods" / "SeaSprint.pak",
+        paths.content_paks / "LogicMods" / "SeaSprint.ucas",
+    ]
     assert not plan.errors
 
 
@@ -105,6 +189,7 @@ def test_missing_ue4ss_runtime_warns(tmp_path: Path) -> None:
     )
 
     assert any("UE4SS runtime" in warning for warning in plan.warnings)
+    assert any("Import/add a UE4SS Runtime package" in warning for warning in plan.warnings)
 
 
 def test_loose_overlay_is_review_blocked(tmp_path: Path) -> None:
@@ -297,6 +382,18 @@ def _paths(tmp_path: Path) -> S2AppPaths:
     (root / "Subnautica2" / "Content" / "Paks").mkdir(parents=True)
     (root / "Subnautica2" / "Binaries" / "Win64").mkdir(parents=True)
     return S2AppPaths(client_root=root)
+
+
+def _gamepass_paths(tmp_path: Path) -> S2AppPaths:
+    root = tmp_path / "XboxGames" / "Subnautica 2"
+    project = root / "Content" / "Subnautica2"
+    (project / "Content" / "Paks").mkdir(parents=True)
+    wingdk = project / "Binaries" / "WinGDK"
+    wingdk.mkdir(parents=True)
+    (wingdk / "Subnautica2-WinGDK-Shipping.exe").write_bytes(b"shipping")
+    layout = normalize_install_path(project / "Binaries" / "WinGDK")
+    assert layout is not None
+    return S2AppPaths(client_root=layout.client_root, install_layout=layout)
 
 
 def _source(tmp_path: Path, *, files: list[str]) -> LibrarySource:

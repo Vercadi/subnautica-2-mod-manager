@@ -23,7 +23,14 @@ from ..models.deployment import (
 )
 from ..models.library import LibraryComponent, LibraryComponentFile, LibrarySource
 from ..models.profile import ModProfile
+from .pak_targets import pak_target_path
 from .review_policy import review_policy_for_component, review_required_action_reason
+
+
+UE4SS_RUNTIME_APPLY_GUIDANCE = (
+    "Requires UE4SS runtime. Import/add a UE4SS Runtime package to this profile, "
+    "or install UE4SS manually first."
+)
 
 
 def build_deployment_plan(
@@ -46,6 +53,10 @@ def build_deployment_plan(
     )
     if paths.client_root is None:
         plan.errors.append("Subnautica 2 install root is not configured.")
+    elif paths.is_gamepass_experimental:
+        plan.warnings.append(
+            "Game Pass / WinGDK support is experimental. UE4SS base/runtime files target the Game Pass Content root, while standard Lua mods target WinGDK\\ue4ss\\Mods; review every target before applying."
+        )
 
     sources_by_id = {source.source_id: source for source in sources}
     components_by_id = {component.component_id: component for component in components}
@@ -79,7 +90,7 @@ def build_deployment_plan(
             for component in enabled_components
         )
         if not ue4ss_runtime_installed and not has_profile_runtime:
-            plan.warnings.append("UE4SS mod is enabled without a UE4SS runtime in the profile or install.")
+            plan.warnings.append(UE4SS_RUNTIME_APPLY_GUIDANCE)
 
     _plan_ue4ss_activation_files(plan, profile_ue4ss_states, paths, activation_policy)
     _detect_target_conflicts(plan)
@@ -383,13 +394,11 @@ def _read_text_lines(path: Path) -> list[str]:
 
 def _target_for_file(component: LibraryComponent, file: LibraryComponentFile, paths: S2AppPaths) -> Path | None:
     if component.component_type == COMPONENT_PAK_BUNDLE:
-        if paths.mods_paks is None:
-            return None
-        return paths.mods_paks / _target_name(file)
+        return pak_target_path(paths.content_paks, file.target_hint, file.source_path)
     if component.component_type == COMPONENT_UE4SS_RUNTIME:
-        if paths.win64 is None:
+        if paths.ue4ss_runtime_root is None:
             return None
-        return paths.win64 / _target_relative(file)
+        return paths.ue4ss_runtime_root / _target_relative(file)
     if component.component_type == COMPONENT_UE4SS_MOD:
         if paths.ue4ss_mods is None:
             return None

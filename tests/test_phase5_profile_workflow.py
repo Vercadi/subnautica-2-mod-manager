@@ -103,6 +103,7 @@ def test_warning_generation_for_missing_runtime_and_review(tmp_path: Path) -> No
     messages = [warning.message for warning in warnings]
 
     assert any("UE4SS runtime" in message for message in messages)
+    assert any("Import/add a UE4SS Runtime package" in message for message in messages)
     assert any("Ambiguous" in message for message in messages)
     assert any("missing from the imported library" in message for message in messages)
 

@@ -86,7 +86,7 @@ class ConsolePanel(ctk.CTkFrame):
     def seed(self) -> None:
         lines = [
             "Console initialized.",
-            "Apply Preview can install safe managed plans and records every file in the manifest.",
+            "Preview & Apply can install safe managed plans and records every file in the manifest.",
             "Recovery removes only manifest-tracked managed files; unknown files are left alone.",
             "Loose root overlays are review-required and blocked from automatic apply.",
             "Scanner, library, profile, preview, manifest, recovery, and diagnostics services ready.",

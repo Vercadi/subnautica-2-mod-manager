@@ -26,7 +26,7 @@ class ImportComponentReview:
         if self.target_hint:
             bits.append(self.target_hint)
         if self.review_policy_text:
-            bits.append("review required")
+            bits.append("Needs Review")
         return " | ".join(bits)
 
 
@@ -58,10 +58,10 @@ class ImportSourceReview:
         if not self.importable:
             return "Not importable"
         if self.ambiguous:
-            return "Review required"
+            return "Needs Review"
         if self.issue_count:
             return f"{self.issue_count} issue(s)"
-        return "Ready"
+        return "Ready to Import"
 
 
 @dataclass(frozen=True)

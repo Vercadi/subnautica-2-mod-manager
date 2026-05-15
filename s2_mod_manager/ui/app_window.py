@@ -43,6 +43,11 @@ from ..core.installer import Installer
 from ..core.logging_service import setup_logging
 from ..core.manifest_store import ManifestStore
 from ..core.needs_attention import build_needs_attention
+from ..core.profile_actions import (
+    enable_imported_sources,
+    smart_set_component_enabled,
+    smart_toggle_component,
+)
 from ..core.profile_store import ProfileStore
 from ..core.profile_workflow import (
     LoadoutWarning,
@@ -323,22 +328,40 @@ class AppWindow(ctk.CTk):
         self._console_write(self._inbox_summary())
         self._record_activity("scan inbox", "completed", target=str(self.app_state.paths.archive_inbox_dir or ""), details=self.library_view.summary.text)
         if self.library_view.summary.candidate_source_count:
-            self._console_write("Inbox candidates are visible in the library list. Use Import Selected/All or browse/drop for review.")
+            self._console_write("Inbox candidates are visible in the library list. Use Import+Enable or browse/drop for review.")
 
     def import_selected(self, mod: PlaceholderMod) -> None:
         if not mod.source_path:
             self._console_write("Import selected: no source selected.")
             return
         imported = import_selected_candidates(self.library_store, self.inbox_scans, {mod.source_path})
+        enable_result = None
+        if imported:
+            enable_result = enable_imported_sources(
+                self.profile_store,
+                imported,
+                self.library_store.list_components(),
+            )
         self._refresh_library_view(refresh_diagnostics=True)
         self._console_write(f"Import selected: {len(imported)} source(s) now in manager library. {self.library_view.summary.text}")
-        self._record_activity("import selected", f"{len(imported)} source(s)", target=mod.name)
+        if enable_result is not None:
+            self._console_write(enable_result.message)
+        self._record_activity("import selected", f"{len(imported)} source(s) + enable", target=mod.name)
 
     def import_all(self) -> None:
         imported = import_all_candidates(self.library_store, self.inbox_scans)
+        enable_result = None
+        if imported:
+            enable_result = enable_imported_sources(
+                self.profile_store,
+                imported,
+                self.library_store.list_components(),
+            )
         self._refresh_library_view(refresh_diagnostics=True)
         self._console_write(f"Import all: {len(imported)} source(s) now in manager library. {self.library_view.summary.text}")
-        self._record_activity("import all", f"{len(imported)} source(s)", details=self.library_view.summary.text)
+        if enable_result is not None:
+            self._console_write(enable_result.message)
+        self._record_activity("import all", f"{len(imported)} source(s) + enable", details=self.library_view.summary.text)
 
     def browse_import_sources(self) -> None:
         paths = filedialog.askopenfilenames(
@@ -375,15 +398,33 @@ class AppWindow(ctk.CTk):
             self,
             tokens=self.tokens,
             review=review,
-            on_import=lambda selection: self.import_review_selection(review, selection),
+            on_import=lambda selection, enable=False: self.import_review_selection(review, selection, enable=enable),
         )
 
-    def import_review_selection(self, review: ImportReview, selection: ImportSelection) -> None:
+    def import_review_selection(self, review: ImportReview, selection: ImportSelection, *, enable: bool = False) -> None:
         imported = import_selected_review_sources(self.library_store, review, selection)
+        enable_result = None
+        if enable and imported:
+            selected_component_ids = {
+                component_id
+                for component_ids in selection.selected_sources.values()
+                for component_id in component_ids
+            }
+            enable_result = enable_imported_sources(
+                self.profile_store,
+                imported,
+                self.library_store.list_components(),
+                selected_component_ids=selected_component_ids,
+            )
         self.inbox_scans = scan_inbox(self.app_state.paths.archive_inbox_dir)
         self._refresh_library_view(refresh_diagnostics=True)
         self._console_write(import_review_summary(review, imported_count=len(imported)))
-        self._record_activity("import review", f"imported {len(imported)} source(s)", details=review.summary_text)
+        if enable_result is not None:
+            self._console_write(enable_result.message)
+        state = f"imported {len(imported)} source(s)"
+        if enable:
+            state += " + enable"
+        self._record_activity("import review", state, details=review.summary_text)
 
     def open_recovery_dialog(self) -> None:
         self._refresh_recovery_state()
@@ -618,34 +659,29 @@ class AppWindow(ctk.CTk):
         self._record_activity("profile", "deleted", target=active.name)
 
     def add_to_profile(self, mod: PlaceholderMod) -> None:
-        active = self.profile_store.active_profile()
-        if active.protected:
-            self._console_write("Create or save as a non-Vanilla profile before adding mods.")
-            return
-        library_components = self.library_store.list_components()
-        library_component_ids = {component.component_id for component in library_components}
         if not mod.component_id:
-            self._console_write("Add to loadout requires a selected imported library component.")
+            self._console_write("Import this mod before adding it to a profile.")
             return
-        if mod.component_id not in library_component_ids:
-            if mod.state.startswith("candidate"):
-                self._console_write("Import this inbox candidate before adding it to a profile.")
-            else:
-                self._console_write(f"Component is not in the imported library: {mod.name}")
+        if mod.state.startswith("candidate"):
+            self._console_write("Import this inbox candidate before enabling it.")
             return
-        try:
-            changed = self.profile_store.add_component(
-                active.profile_id,
-                mod.component_id,
-                library_components,
-            )
-        except ValueError as exc:
-            self._console_write(str(exc))
+        if mod.review_policy_text:
+            self._console_write(f"Needs review before profile enable: {mod.review_policy_text}")
             return
+        result = smart_set_component_enabled(
+            self.profile_store,
+            mod.component_id,
+            self.library_store.list_components(),
+            enabled=True,
+        )
         self._refresh_library_view(rebuild_library=False)
-        action = "Added" if changed else "Already in"
-        self._console_write(f"{action} active profile: {mod.name}")
-        self._record_activity("profile loadout", action.casefold(), target=mod.name)
+        self._console_write(result.message)
+        self._record_activity(
+            "profile loadout",
+            "enabled" if result.ok else "refused",
+            target=mod.name,
+            details=result.message,
+        )
 
     def remove_from_profile(self, mod: PlaceholderMod) -> None:
         active = self.profile_store.active_profile()
@@ -659,22 +695,28 @@ class AppWindow(ctk.CTk):
         self._record_activity("profile loadout", "removed" if changed else "not present", target=mod.name)
 
     def toggle_profile_entry(self, mod: PlaceholderMod) -> None:
-        active = self.profile_store.active_profile()
-        if not mod.in_active_profile:
-            self.add_to_profile(mod)
+        if not mod.component_id:
+            self._console_write("Import this mod before enabling it.")
             return
-        try:
-            changed = self.profile_store.set_component_enabled(
-                active.profile_id,
-                mod.component_id,
-                not mod.profile_enabled,
-            )
-        except ValueError as exc:
-            self._console_write(str(exc))
+        if mod.state.startswith("candidate"):
+            self._console_write("Import this inbox candidate before enabling it.")
             return
+        if mod.review_policy_text and not mod.in_active_profile:
+            self._console_write(f"Needs review before profile enable: {mod.review_policy_text}")
+            return
+        result = smart_toggle_component(
+            self.profile_store,
+            mod.component_id,
+            self.library_store.list_components(),
+        )
         self._refresh_library_view(rebuild_library=False)
-        self._console_write(f"Profile entry {'updated' if changed else 'unchanged'}: {mod.name}")
-        self._record_activity("profile loadout", "toggled" if changed else "unchanged", target=mod.name)
+        self._console_write(result.message)
+        self._record_activity(
+            "profile loadout",
+            "toggled" if result.ok else "refused",
+            target=mod.name,
+            details=result.message,
+        )
 
     def move_profile_entry(self, mod: PlaceholderMod, delta: int) -> None:
         active = self.profile_store.active_profile()
@@ -746,7 +788,7 @@ class AppWindow(ctk.CTk):
             self._console_write("Deployment preview unavailable.")
             return
         preview = build_apply_preview(plan)
-        self._console_write(f"Apply preview opened: {preview.summary_text}")
+        self._console_write(f"Preview & Apply opened: {preview.summary_text}")
         self._record_activity("apply preview", "opened", details=preview.summary_text)
         ApplyPreviewDialog(
             self,
@@ -905,8 +947,8 @@ class AppWindow(ctk.CTk):
             warnings.append(mod.review_policy_text)
         lines = [
             mod.name,
-            f"State: {mod.state.replace('_', ' ').title()}",
-            f"Profile: {'in active profile' if mod.in_active_profile else 'not in active profile'}",
+            f"State: {'Enabled' if mod.in_active_profile and mod.profile_enabled else 'Disabled' if mod.in_active_profile else 'Imported' if mod.state == 'library' else 'Ready to Import' if mod.state.startswith('candidate') else mod.state.replace('_', ' ').title()}",
+            f"Profile: {'Enabled in active profile' if mod.in_active_profile and mod.profile_enabled else 'Disabled in active profile' if mod.in_active_profile else 'Not in Profile'}",
             "",
             "Warnings:",
         ]
@@ -921,7 +963,7 @@ class AppWindow(ctk.CTk):
                 "- Import candidates before adding them to profiles.",
                 "- Add UE4SS Runtime to the same profile before UE4SS mods when warned.",
                 "- Keep review-required loose overlays out of release profiles until manually reviewed.",
-                "- Use Apply Preview to inspect exact target paths before any guarded apply.",
+                "- Use Preview & Apply Profile to inspect exact target paths before any guarded apply.",
             ]
         )
         self._record_activity("warning details", "opened", target=mod.name)
@@ -1153,9 +1195,11 @@ class AppWindow(ctk.CTk):
     def _ue4ss_runtime_installed(self) -> bool:
         paths = self.app_state.paths
         win64 = paths.win64
+        runtime_root = paths.ue4ss_runtime_root
         ue4ss_root = paths.ue4ss_root
-        if win64 and any((win64 / name).exists() for name in ("UE4SS.dll", "dwmapi.dll", "xinput1_3.dll")):
-            return True
+        for root in (runtime_root, win64):
+            if root and any((root / name).exists() for name in ("UE4SS.dll", "dwmapi.dll", "xinput1_3.dll")):
+                return True
         return bool(ue4ss_root and ((ue4ss_root / "UE4SS.dll").exists() or ue4ss_root.exists()))
 
     def _record_activity(self, action: str, result: str, *, target: str = "", details: str = "") -> None:

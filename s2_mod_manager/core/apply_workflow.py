@@ -70,7 +70,7 @@ def _disabled_reason(plan: DeploymentPlan, *, fake: bool, allow_apply: bool) -> 
     if plan.dry_run and fake:
         return "Preview is dry-run only; build an execution plan for the fake test install to apply."
     if plan.dry_run:
-        return "Preview is dry-run only; open Apply Preview to build an executable managed plan."
+        return "Preview is dry-run only; open Preview & Apply Profile to build an executable managed plan."
     if not plan.real_apply_enabled:
         return "Apply is disabled for this plan."
     if not (plan.creates or plan.overwrites or plan.deletes):

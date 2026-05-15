@@ -126,10 +126,20 @@ class SettingsDialog(ctk.CTkToplevel):
     def _install_card(self, parent, row: int) -> int:
         card = self._card(parent, row, "Subnautica 2 Install")
         self._value(card, 1, "Status", self.view.install_status_text)
-        self._value(card, 2, "Steam", self.view.steam_status)
-        self._value(card, 3, "Build", self.view.build_status)
-        self._button(card, 4, "Browse Install", self._browse_install_clicked, column=1)
-        self._button(card, 4, "Auto Detect", self._auto_detect_clicked, column=2)
+        self._value(card, 2, "Layout", self.view.install_variant)
+        self._value(card, 3, "Project", str(self.view.project_root or "not configured"))
+        self._value(card, 4, "Binaries", str(self.view.binaries_dir or "not configured"))
+        self._value(card, 5, "Paks", str(self.view.pak_dir or "not configured"))
+        self._value(card, 6, "UE4SS Mods", str(self.view.ue4ss_target_dir or "not configured"))
+        self._value(card, 7, "Steam", self.view.steam_status)
+        self._value(card, 8, "Build", self.view.build_status)
+        if self.view.gamepass_experimental:
+            self._value(card, 9, "Game Pass", "Experimental support. UE4SS base/runtime files target Content; standard Lua mods target WinGDK\\ue4ss\\Mods. Review Preview & Apply targets.")
+            button_row = 10
+        else:
+            button_row = 9
+        self._button(card, button_row, "Browse Install", self._browse_install_clicked, column=1)
+        self._button(card, button_row, "Auto Detect", self._auto_detect_clicked, column=2)
         return row + 1
 
     def _paths_card(self, parent, row: int) -> int:

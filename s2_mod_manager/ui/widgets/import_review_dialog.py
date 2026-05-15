@@ -83,8 +83,21 @@ class ImportReviewDialog(ctk.CTkToplevel):
         ).grid(row=0, column=1, padx=(0, 8))
         ctk.CTkButton(
             footer,
-            text="Import Selected",
-            width=150,
+            text="Import Only",
+            width=130,
+            height=34,
+            fg_color=c.glass_navy,
+            hover_color=c.panel_glass,
+            border_width=1,
+            border_color=c.border_cold,
+            text_color=c.text_secondary,
+            state="normal" if self.review.importable_source_count else "disabled",
+            command=self._import_only_clicked,
+        ).grid(row=0, column=2, padx=(0, 8))
+        ctk.CTkButton(
+            footer,
+            text="Import & Enable",
+            width=160,
             height=34,
             fg_color=c.glass_cyan,
             hover_color=c.panel_glass_hover,
@@ -92,8 +105,8 @@ class ImportReviewDialog(ctk.CTkToplevel):
             border_color=c.shell_border,
             text_color=c.text_primary,
             state="normal" if self.review.importable_source_count else "disabled",
-            command=self._import_clicked,
-        ).grid(row=0, column=2)
+            command=self._import_enable_clicked,
+        ).grid(row=0, column=3)
 
     def _empty_state(self, parent) -> None:
         ctk.CTkLabel(
@@ -218,7 +231,15 @@ class ImportReviewDialog(ctk.CTkToplevel):
         ).grid(row=0, column=0, sticky="w")
         return frame
 
-    def _import_clicked(self) -> None:
+    def _import_only_clicked(self) -> None:
+        self.on_import(self._selection(), False)
+        self.destroy()
+
+    def _import_enable_clicked(self) -> None:
+        self.on_import(self._selection(), True)
+        self.destroy()
+
+    def _selection(self) -> ImportSelection:
         selected: dict[str, set[str]] = {}
         for source in self.review.sources:
             if not self.source_vars[source.source_key].get():
@@ -230,5 +251,4 @@ class ImportReviewDialog(ctk.CTkToplevel):
             }
             if component_ids:
                 selected[source.source_key] = component_ids
-        self.on_import(ImportSelection(selected))
-        self.destroy()
+        return ImportSelection(selected)

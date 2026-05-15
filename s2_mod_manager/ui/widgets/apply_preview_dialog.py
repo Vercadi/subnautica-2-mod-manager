@@ -16,7 +16,7 @@ class ApplyPreviewDialog(ctk.CTkToplevel):
         self.on_apply = on_apply
         self.result_label: ctk.CTkLabel | None = None
         self.apply_button: ctk.CTkButton | None = None
-        self.title("Apply Profile Preview")
+        self.title("Preview & Apply Profile")
         self.configure(fg_color=tokens.colors.bg_abyss)
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(1, weight=1)
@@ -37,7 +37,7 @@ class ApplyPreviewDialog(ctk.CTkToplevel):
         header.grid_columnconfigure(0, weight=1)
         ctk.CTkLabel(
             header,
-            text=f"Apply Preview: {self.preview.profile_name}",
+            text=f"Preview & Apply Profile: {self.preview.profile_name}",
             text_color=c.text_primary,
             font=(t.font_family, t.section_title, "bold"),
         ).grid(row=0, column=0, sticky="w", padx=14, pady=(10, 2))

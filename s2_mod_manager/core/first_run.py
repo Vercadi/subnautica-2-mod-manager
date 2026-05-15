@@ -12,7 +12,7 @@ def prepare_first_run_state(dirs: AppDirs, settings_path: Path) -> list[str]:
     messages.append(f"Runtime directories ready: {dirs.data_dir}")
     messages.append(f"Library directory ready: {dirs.library_dir}")
     messages.append(f"Backup directory ready: {dirs.backup_dir}")
-    messages.append("Release safety: Apply Preview writes only non-blocked managed files and records every apply in the manifest.")
+    messages.append("Release safety: Preview & Apply writes only non-blocked managed files and records every apply in the manifest.")
     messages.append("Recovery removes only manifest-tracked managed files; unknown files are reported, not deleted.")
     messages.append("Loose root overlays such as loader DLL/config drops are review-required and blocked from automatic apply.")
 

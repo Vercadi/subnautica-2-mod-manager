@@ -80,7 +80,7 @@ def test_release_metadata_generation(tmp_path: Path) -> None:
 
     assert metadata["app_name"] == __app_name__
     assert parsed["version"] == __version__
-    assert parsed["safety_defaults"]["real_apply"] == "enabled_for_non_blocked_apply_preview_plans"
+    assert parsed["safety_defaults"]["real_apply"] == "enabled_for_non_blocked_preview_apply_plans"
     assert parsed["safety_defaults"]["destructive_recovery"] == "manifest_tracked_managed_files_only"
 
 

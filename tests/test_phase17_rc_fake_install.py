@@ -50,7 +50,7 @@ def test_real_sample_shaped_fake_install_apply_uninstall_and_restore_preview(tmp
     assert len(result.record.deployed_files) == 18
     assert len(result.record.backups) == 1
     assert preexisting.read_bytes() != b"old pak"
-    assert (paths.mods_paks / "SeaSprint.pak").is_file()
+    assert (paths.logic_mods / "SeaSprint.pak").is_file()
     assert (paths.ue4ss_root / "UE4SS.dll").is_file()
     assert (paths.ue4ss_mods / "HUDToggle" / "Scripts" / "main.lua").is_file()
     assert (paths.ue4ss_mods / "ScannerSpeedMod" / "original_durations.lua").is_file()
@@ -71,7 +71,7 @@ def test_real_sample_shaped_fake_install_apply_uninstall_and_restore_preview(tmp
     assert reloaded.status == STATUS_UNINSTALLED
     assert preexisting.read_bytes() == b"old pak"
     assert save.read_bytes() == b"save"
-    assert not (paths.mods_paks / "SeaSprint.pak").exists()
+    assert not (paths.logic_mods / "SeaSprint.pak").exists()
     assert not (paths.ue4ss_mods / "ScannerSpeedMod" / "original_durations.lua").exists()
     assert preview_after.managed_files == []
     assert preview_after.unknown_files == [preexisting]
@@ -103,7 +103,7 @@ def test_real_sample_shaped_profile_with_sn2p_is_blocked_and_refused(tmp_path: P
     assert result.record.status == STATUS_REFUSED
     assert "blocked deployment plan" in result.record.errors[0]
     assert not (paths.client_root / "dxgi.dll").exists()
-    assert not (paths.mods_paks / "SeaSprint.pak").exists()
+    assert not (paths.logic_mods / "SeaSprint.pak").exists()
 
 
 def test_real_sample_shaped_non_test_install_refuses_writes(tmp_path: Path) -> None:

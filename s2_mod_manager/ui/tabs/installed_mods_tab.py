@@ -135,6 +135,8 @@ class InstalledModsTab(ctk.CTkFrame):
         self.count_label: ctk.CTkLabel | None = None
         self.profile_menu: ctk.CTkOptionMenu | None = None
         self.profile_status_label: ctk.CTkLabel | None = None
+        self.preview_button: ctk.CTkButton | None = None
+        self.preview_reason_label: ctk.CTkLabel | None = None
         self.grid_columnconfigure(0, weight=0, minsize=330)
         self.grid_columnconfigure(1, weight=1)
         self.grid_rowconfigure(0, weight=1)
@@ -153,7 +155,7 @@ class InstalledModsTab(ctk.CTkFrame):
         self.center_panel = center
         center.grid(row=0, column=1, sticky="nsew", padx=(t.panel_gap, 0), pady=0)
         center.grid_columnconfigure(0, weight=1)
-        center.grid_columnconfigure(1, weight=0, minsize=130)
+        center.grid_columnconfigure(1, weight=0, minsize=150)
         center.grid_rowconfigure(0, weight=1)
 
         self.inspector = ModInspector(
@@ -162,6 +164,7 @@ class InstalledModsTab(ctk.CTkFrame):
             mod=self.selected,
             ue4ss_policy=self.ue4ss_policy,
             on_toggle_ue4ss_policy=self.on_toggle_ue4ss_policy,
+            on_preview_deployment=self.on_preview_deployment,
         )
         self.inspector.grid(row=0, column=0, sticky="nsw", pady=0)
 
@@ -200,6 +203,7 @@ class InstalledModsTab(ctk.CTkFrame):
             self.inspector.set_mod(self.selected)
         if self.count_label is not None:
             self.count_label.configure(text=self._count_text())
+        self._refresh_preview_button()
         if previous_keys == next_keys and self._update_rows_in_place():
             self._restore_list_view(previous_view)
             return
@@ -228,6 +232,7 @@ class InstalledModsTab(ctk.CTkFrame):
             self.profile_menu.set(self.active_profile_name)
         if self.profile_status_label is not None:
             self.profile_status_label.configure(text=self._profile_status_text())
+        self._refresh_preview_button()
 
     def enable_native_drop(self, callback=None) -> bool:
         self.native_drop_callback = callback or self._drop_sources_received
@@ -305,7 +310,7 @@ class InstalledModsTab(ctk.CTkFrame):
     def _source_header(self, mod: PlaceholderMod) -> ctk.CTkLabel:
         c = self.tokens.colors
         label = mod.source_name or "Placeholder Source"
-        state = mod.state.replace("_", " ").title()
+        state = _state_label(mod)
         return ctk.CTkLabel(
             self.list_frame,
             text=_fit_text(f"{state}: {label}", 82),
@@ -380,14 +385,39 @@ class InstalledModsTab(ctk.CTkFrame):
             justify="left",
         )
         self.profile_status_label.grid(row=3, column=0, sticky="ew", padx=10, pady=(0, 8))
+        preview_text, preview_enabled, preview_reason = self._preview_action_state()
+        self.preview_button = ctk.CTkButton(
+            side,
+            text=preview_text,
+            width=132,
+            height=34,
+            fg_color=c.glass_cyan if preview_enabled else c.disabled,
+            hover_color=c.panel_glass_hover if preview_enabled else c.disabled,
+            border_width=1,
+            border_color=c.shell_border if preview_enabled else c.border_soft,
+            text_color=c.text_primary if preview_enabled else c.text_muted,
+            font=(t.font_family, t.tiny, "bold"),
+            command=self._preview_deployment_clicked,
+            state="normal" if preview_enabled else "disabled",
+        )
+        self.preview_button.grid(row=4, column=0, sticky="ew", padx=10, pady=(0, 4))
+        self.preview_reason_label = ctk.CTkLabel(
+            side,
+            text=preview_reason,
+            text_color=c.text_muted,
+            font=(t.font_family, t.tiny),
+            wraplength=126,
+            justify="left",
+        )
+        self.preview_reason_label.grid(row=5, column=0, sticky="ew", padx=10, pady=(0, 8))
 
         buttons = (
             ("Install From File", self._browse_sources_clicked, True),
             ("Install Folder", self._browse_folder_clicked, False),
             ("Scan Inbox", self._scan_clicked, False),
-            ("Import Sel", self._import_selected_clicked, False),
-            ("Import All", self._import_all_clicked, True),
-            ("Add", self._add_to_profile_clicked, False),
+            ("Import+On Sel", self._import_selected_clicked, False),
+            ("Import+On All", self._import_all_clicked, True),
+            ("Enable Selected", self._add_to_profile_clicked, False),
             ("Select All", self._select_all_clicked, False),
             ("Clear Sel", self._clear_selected_clicked, False),
             ("Remove Sel", self._remove_selected_clicked, False),
@@ -395,11 +425,11 @@ class InstalledModsTab(ctk.CTkFrame):
             ("Off All", self._deactivate_all_clicked, False),
             ("Clear Profile", self._remove_all_clicked, False),
         )
-        for index, (text, command, primary) in enumerate(buttons, start=4):
+        for index, (text, command, primary) in enumerate(buttons, start=6):
             ctk.CTkButton(
                 side,
                 text=text,
-                width=112,
+                width=132,
                 height=24,
                 fg_color=c.glass_cyan if primary else c.glass_black,
                 hover_color=c.panel_glass_hover if primary else c.panel_glass,
@@ -490,10 +520,29 @@ class InstalledModsTab(ctk.CTkFrame):
         return f"Mods  L{library_count}  C{candidate_count}  P{profile_count}"
 
     def _profile_status_text(self) -> str:
-        bits = ["protected" if self.active_profile_protected else "editable"]
+        bits = ["Vanilla protected" if self.active_profile_protected else "Editable profile"]
         if self.profile_warning_count:
             bits.append(f"{self.profile_warning_count} warning(s)")
         return " | ".join(bits)
+
+    def _preview_action_state(self) -> tuple[str, bool, str]:
+        return preview_apply_action_state(self.mods, has_preview_callback=self.on_preview_deployment is not None)
+
+    def _refresh_preview_button(self) -> None:
+        if self.preview_button is None:
+            return
+        text, enabled, reason = self._preview_action_state()
+        c = self.tokens.colors
+        self.preview_button.configure(
+            text=text,
+            fg_color=c.glass_cyan if enabled else c.disabled,
+            hover_color=c.panel_glass_hover if enabled else c.disabled,
+            border_color=c.shell_border if enabled else c.border_soft,
+            text_color=c.text_primary if enabled else c.text_muted,
+            state="normal" if enabled else "disabled",
+        )
+        if self.preview_reason_label is not None:
+            self.preview_reason_label.configure(text=reason)
 
     def _scan_clicked(self) -> None:
         if self.on_scan:
@@ -640,7 +689,7 @@ class InstalledModsTab(ctk.CTkFrame):
         self.selected = mod
         menu = tk.Menu(self, tearoff=False)
         menu.add_command(
-            label="Add to Profile",
+            label="Enable in Profile",
             command=lambda: self._add_to_profile_for_mod(mod),
             state="normal" if self._can_add_mod_to_profile(mod) else "disabled",
         )
@@ -653,7 +702,7 @@ class InstalledModsTab(ctk.CTkFrame):
         menu.add_command(
             label="Enable / Disable",
             command=lambda: self._toggle_profile_entry_for_mod(mod),
-            state="normal" if mod.in_active_profile and not self.active_profile_protected else "disabled",
+            state="normal" if self._can_switch_mod(mod) else "disabled",
         )
         menu.add_separator()
         menu.add_command(
@@ -666,19 +715,19 @@ class InstalledModsTab(ctk.CTkFrame):
             command=lambda: self._open_source_clicked(mod),
             state="normal" if (mod.source_path or mod.managed_path) else "disabled",
         )
-        menu.add_command(label="Apply Preview", command=self._preview_deployment_clicked)
+        menu.add_command(label="Preview & Apply Profile", command=self._preview_deployment_clicked)
         try:
             menu.tk_popup(x_root, y_root)
         finally:
             menu.grab_release()
 
     def _can_switch_mod(self, mod: PlaceholderMod) -> bool:
-        if self.active_profile_protected:
-            return False
-        return mod.in_active_profile or self._can_add_mod_to_profile(mod)
+        if mod.in_active_profile:
+            return not self.active_profile_protected
+        return self._can_add_mod_to_profile(mod)
 
     def _can_add_mod_to_profile(self, mod: PlaceholderMod) -> bool:
-        if self.active_profile_protected or mod.in_active_profile or not mod.component_id:
+        if mod.in_active_profile or not mod.component_id or mod.review_policy_text:
             return False
         return mod.state == "library"
 
@@ -834,3 +883,27 @@ def _empty_selection() -> PlaceholderMod:
 
 def _mod_key(mod: PlaceholderMod) -> str:
     return mod.component_id or mod.source_path or mod.name
+
+
+def preview_apply_action_state(
+    mods: list[PlaceholderMod],
+    *,
+    has_preview_callback: bool = True,
+) -> tuple[str, bool, str]:
+    if not has_preview_callback:
+        return "Preview & Apply Profile", False, "Apply preview unavailable."
+    if not any(mod.in_active_profile and mod.profile_enabled for mod in mods):
+        return "Preview & Apply Profile", False, "Enable at least one imported mod."
+    return "Preview & Apply Profile", True, "Review exact target paths before applying."
+
+
+def _state_label(mod: PlaceholderMod) -> str:
+    if mod.review_policy_text or mod.warning or mod.profile_warning:
+        return "Needs Review"
+    if mod.in_active_profile:
+        return "Enabled" if mod.profile_enabled else "Disabled"
+    if mod.state == "library":
+        return "Imported"
+    if mod.state.startswith("candidate"):
+        return "Ready to Import"
+    return mod.state.replace("_", " ").title()

@@ -34,7 +34,47 @@ def test_zip_pak_bundle_groups_companions(tmp_path: Path) -> None:
     component = scan.components[0]
     assert component.component_type == COMPONENT_PAK_BUNDLE
     assert component.target_hint.endswith(r"Content\Paks\~mods")
+    assert {file.target_hint for file in component.files} == {
+        "~mods/InfiniteOxygen_P.pak",
+        "~mods/InfiniteOxygen_P.ucas",
+        "~mods/InfiniteOxygen_P.utoc",
+    }
     assert [file.role for file in component.files] == ["pak", "companion", "companion"]
+
+
+def test_non_patch_pak_bundle_targets_logicmods(tmp_path: Path) -> None:
+    archive = tmp_path / "SeaSprint.zip"
+    _write_zip(
+        archive,
+        {
+            "SeaSprint/SeaSprint.pak": b"pak",
+            "SeaSprint/SeaSprint.ucas": b"ucas",
+            "SeaSprint/SeaSprint.utoc": b"utoc",
+        },
+    )
+
+    scan = inspect_archive(archive)
+
+    assert scan.ok
+    component = scan.components[0]
+    assert component.component_type == COMPONENT_PAK_BUNDLE
+    assert component.target_hint.endswith(r"Content\Paks\LogicMods")
+    assert {file.target_hint for file in component.files} == {
+        "LogicMods/SeaSprint.pak",
+        "LogicMods/SeaSprint.ucas",
+        "LogicMods/SeaSprint.utoc",
+    }
+
+
+def test_explicit_logicmods_prefix_is_preserved(tmp_path: Path) -> None:
+    archive = tmp_path / "ExplicitLogic.zip"
+    _write_zip(archive, {"Subnautica2/Content/Paks/LogicMods/SeaSprint.pak": b"pak"})
+
+    scan = inspect_archive(archive)
+
+    component = scan.components[0]
+    assert component.target_hint.endswith(r"Content\Paks\LogicMods")
+    assert component.files[0].target_hint == "LogicMods/SeaSprint.pak"
 
 
 def test_zip_ue4ss_runtime_detects_core_files(tmp_path: Path) -> None:
@@ -58,6 +98,52 @@ def test_zip_ue4ss_runtime_detects_core_files(tmp_path: Path) -> None:
     assert any(file.target_hint == "dwmapi.dll" for file in component.files)
 
 
+def test_gamepass_content_root_runtime_strips_content_prefix(tmp_path: Path) -> None:
+    archive = tmp_path / "UE4SS GamePass.zip"
+    _write_zip(
+        archive,
+        {
+            "Content/ue4ss/UE4SS.dll": b"dll",
+            "Content/ue4ss/UE4SS-settings.ini": b"settings",
+            "Content/dwmapi.dll": b"loader",
+        },
+    )
+
+    scan = inspect_archive(archive)
+
+    assert scan.ok
+    component = scan.components[0]
+    assert component.component_type == COMPONENT_UE4SS_RUNTIME
+    assert {file.target_hint for file in component.files} == {
+        "ue4ss/UE4SS.dll",
+        "ue4ss/UE4SS-settings.ini",
+        "dwmapi.dll",
+    }
+
+
+def test_gamepass_wingdk_runtime_preserves_explicit_project_prefix(tmp_path: Path) -> None:
+    archive = tmp_path / "UE4SS GamePass WinGDK.zip"
+    _write_zip(
+        archive,
+        {
+            "Content/Subnautica2/Binaries/WinGDK/ue4ss/UE4SS.dll": b"dll",
+            "Content/Subnautica2/Binaries/WinGDK/ue4ss/UE4SS-settings.ini": b"settings",
+            "Content/Subnautica2/Binaries/WinGDK/dwmapi.dll": b"loader",
+        },
+    )
+
+    scan = inspect_archive(archive)
+
+    assert scan.ok
+    component = scan.components[0]
+    assert component.component_type == COMPONENT_UE4SS_RUNTIME
+    assert {file.target_hint for file in component.files} == {
+        "Subnautica2/Binaries/WinGDK/ue4ss/UE4SS.dll",
+        "Subnautica2/Binaries/WinGDK/ue4ss/UE4SS-settings.ini",
+        "Subnautica2/Binaries/WinGDK/dwmapi.dll",
+    }
+
+
 def test_zip_ue4ss_mod_strips_full_win64_prefix(tmp_path: Path) -> None:
     archive = tmp_path / "SN2ModSettings.zip"
     _write_zip(
@@ -75,6 +161,29 @@ def test_zip_ue4ss_mod_strips_full_win64_prefix(tmp_path: Path) -> None:
     component = scan.components[0]
     assert component.component_type == COMPONENT_UE4SS_MOD
     assert component.display_name == "SN2ModSettings"
+    assert any("Import/add a UE4SS Runtime package" in warning for warning in component.dependency_warnings)
+    assert {file.target_hint for file in component.files} == {
+        "SN2ModSettings/enabled.txt",
+        "SN2ModSettings/Scripts/main.lua",
+    }
+
+
+def test_zip_ue4ss_mod_strips_full_wingdk_prefix(tmp_path: Path) -> None:
+    archive = tmp_path / "SN2ModSettings GamePass.zip"
+    _write_zip(
+        archive,
+        {
+            "Content/Subnautica2/Binaries/WinGDK/ue4ss/Mods/SN2ModSettings/enabled.txt": b"",
+            "Content/Subnautica2/Binaries/WinGDK/ue4ss/Mods/SN2ModSettings/Scripts/main.lua": b"print('ok')",
+        },
+    )
+
+    scan = inspect_archive(archive)
+
+    assert scan.ok
+    assert len(scan.components) == 1
+    component = scan.components[0]
+    assert component.component_type == COMPONENT_UE4SS_MOD
     assert {file.target_hint for file in component.files} == {
         "SN2ModSettings/enabled.txt",
         "SN2ModSettings/Scripts/main.lua",

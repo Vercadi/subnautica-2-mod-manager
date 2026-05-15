@@ -91,7 +91,7 @@ def test_import_review_surfaces_ambiguous_multi_pak_state(tmp_path: Path) -> Non
     source = review.sources[0]
 
     assert source.ambiguous
-    assert source.status_text == "Review required"
+    assert source.status_text == "Needs Review"
     assert any("Ambiguous" in warning for warning in source.warnings)
 
 

@@ -96,7 +96,7 @@ def _candidate_items(scans: list[ScanResult], imported_hashes: set[str]) -> list
                     version_label="candidate",
                     description="No importable S2 mod component detected.",
                     badges=["Unsupported"],
-                    status="Review",
+                    status="Needs Review",
                     enabled=False,
                     warning="; ".join(dict.fromkeys(warnings)) or "Unsupported or empty source.",
                     accent="#FF7A59",
@@ -108,7 +108,7 @@ def _candidate_items(scans: list[ScanResult], imported_hashes: set[str]) -> list
             )
             continue
         for component_index, component in enumerate(scan.components):
-            status = "Imported" if already_imported else "Candidate"
+            status = "Imported" if already_imported else "Ready to Import"
             warnings = list(component.warnings) + list(component.dependency_warnings) + list(scan.warnings)
             policy = review_policy_for_fields(
                 component.component_type,
@@ -126,7 +126,7 @@ def _candidate_items(scans: list[ScanResult], imported_hashes: set[str]) -> list
                     version_label="candidate",
                     description=_candidate_description(scan.display_name, component.file_count, policy_text=policy.text if policy else ""),
                     badges=list(component.badges),
-                    status=status if not warnings else "Review",
+                    status=status if not warnings else "Needs Review",
                     enabled=False,
                     warning="; ".join(dict.fromkeys(warnings)),
                     accent=_accent_for_component(component.component_type),
@@ -162,7 +162,7 @@ def _item_from_library_component(component: LibraryComponent, source: LibrarySou
         version_label="library",
         description=_library_description(component.file_count, source.display_name if source else "library source", policy_text=policy.text if policy else ""),
         badges=list(component.badges),
-        status="Library" if not warning else "Review",
+        status="Imported" if not warning else "Needs Review",
         enabled=True,
         warning=warning,
         accent=_accent_for_component(component.component_type),
@@ -200,7 +200,7 @@ def _candidate_description(source_name: str, file_count: int, *, policy_text: st
 
 
 def _library_description(file_count: int, source_name: str, *, policy_text: str = "") -> str:
-    base = f"{file_count} file(s) imported from {source_name}. Preview ready; Apply Preview controls managed installs."
+    base = f"{file_count} file(s) imported from {source_name}. Ready to apply through Preview & Apply Profile."
     if policy_text:
         return base + " Review-required loose overlays stay blocked from automatic apply."
     return base

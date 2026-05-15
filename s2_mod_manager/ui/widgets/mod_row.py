@@ -435,15 +435,15 @@ def _row_badges(mod: PlaceholderMod, tokens: UiTokens) -> list[tuple[str, str]]:
         badges.append((f"Loadout #{mod.profile_order + 1}", c.glass_cyan))
         badges.append(("On" if mod.profile_enabled else "Off", c.chip_green if mod.profile_enabled else c.disabled))
     elif mod.state == "library":
-        badges.append(("Library", c.chip_green))
+        badges.append(("Imported", c.chip_green))
     elif mod.state.startswith("candidate"):
-        badges.append(("Candidate", c.chip_orange))
+        badges.append(("Ready", c.chip_orange))
     for badge in mod.badges:
         badges.append((badge, _badge_color(badge, tokens)))
     if mod.deployment_status:
         badges.append((f"Plan {mod.deployment_status}", c.chip_blue))
     if mod.warning or mod.profile_warning:
-        badges.append(("Review", c.chip_orange))
+        badges.append(("Needs Review", c.chip_orange))
     if len(badges) > 6:
         return badges[:5] + [(f"+{len(badges) - 5}", c.border_cold)]
     return badges
@@ -452,9 +452,9 @@ def _row_badges(mod: PlaceholderMod, tokens: UiTokens) -> list[tuple[str, str]]:
 def _status_color(status: str, tokens: UiTokens) -> str:
     c = tokens.colors
     normalized = status.casefold()
-    if normalized in {"library", "scanned", "imported", "compatible"}:
+    if normalized in {"library", "scanned", "imported", "compatible", "ready to apply"}:
         return c.chip_green
-    if normalized in {"candidate", "review"}:
+    if normalized in {"candidate", "review", "needs review", "ready to import"}:
         return c.chip_orange
     if "conflict" in normalized or "missing" in normalized:
         return c.chip_orange
@@ -489,11 +489,11 @@ def _thumbnail_label(mod: PlaceholderMod) -> str:
 def _compact_summary(mod: PlaceholderMod) -> str:
     pieces = []
     if mod.in_active_profile:
-        pieces.append(f"{mod.profile_name or 'Profile'}: {'active' if mod.profile_enabled else 'inactive'}")
+        pieces.append(f"{mod.profile_name or 'Profile'}: {'Enabled' if mod.profile_enabled else 'Disabled'}")
     elif mod.state == "library":
-        pieces.append("Imported library component")
+        pieces.append("Imported")
     elif mod.state.startswith("candidate"):
-        pieces.append("Inbox candidate")
+        pieces.append("Ready to Import")
     else:
         pieces.append(mod.state.replace("_", " ").title())
     if mod.component_type:
@@ -521,28 +521,30 @@ def _compact_status_color(mod: PlaceholderMod, tokens: UiTokens) -> str:
 def _compact_badges(mod: PlaceholderMod) -> str:
     values = []
     if mod.in_active_profile:
-        values.append("ON" if mod.profile_enabled else "OFF")
+        values.append("ENABLED" if mod.profile_enabled else "DISABLED")
     elif mod.state.startswith("candidate"):
-        values.append("CANDIDATE")
+        values.append("READY")
     elif mod.state == "library":
-        values.append("LIBRARY")
+        values.append("IMPORTED")
     values.extend(str(value).upper() for value in mod.badges[:2])
     return " / ".join(dict.fromkeys(values))
 
 
 def _row_action_hint(mod: PlaceholderMod, *, can_toggle: bool, profile_protected: bool = False) -> str:
+    if mod.review_policy_text and not mod.in_active_profile:
+        return "needs review"
     if profile_protected:
         if mod.in_active_profile:
             return "vanilla protected"
         if _is_imported_profile_source(mod):
-            return "make profile"
+            return "enable creates profile"
     if mod.in_active_profile:
-        return "profile" if can_toggle else "protected"
+        return "enabled" if mod.profile_enabled and can_toggle else "disabled" if can_toggle else "protected"
     if _is_imported_profile_source(mod):
-        return "switch adds" if can_toggle else "add first"
+        return "toggle adds" if can_toggle else "needs review"
     if mod.state.startswith("candidate"):
         return "import first"
-    return "preview"
+    return "not ready"
 
 
 def _is_imported_profile_source(mod: PlaceholderMod) -> bool:

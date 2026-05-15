@@ -34,6 +34,17 @@ def collect_diagnostics(
         app_version=__version__,
         install_detected=paths.client_root is not None,
         install_root=redact_path(paths.client_root, home=home) if paths.client_root else "not configured",
+        install_variant=paths.install_variant_label,
+        project_root=redact_path(paths.project_root, home=home) if paths.project_root else "not configured",
+        binaries_dir=redact_path(paths.binaries_dir, home=home) if paths.binaries_dir else "not configured",
+        pak_dir=redact_path(paths.content_paks, home=home) if paths.content_paks else "not configured",
+        ue4ss_runtime_dir=redact_path(paths.ue4ss_runtime_root, home=home) if paths.ue4ss_runtime_root else "not configured",
+        ue4ss_target_dir=redact_path(paths.ue4ss_mods, home=home) if paths.ue4ss_mods else "not configured",
+        experimental_warning=(
+            "Game Pass / WinGDK support is experimental; UE4SS base/runtime files target the Content root and standard Lua mods target WinGDK\\ue4ss\\Mods. Verify Preview & Apply targets and report crashes with a support report."
+            if paths.is_gamepass_experimental
+            else ""
+        ),
         build_summary=paths.build_summary,
         steam_manifest_status=_manifest_status(paths),
         archive_support=archive_support_status(),
@@ -105,14 +116,17 @@ def _manifest_status(paths: S2AppPaths) -> str:
 
 
 def _ue4ss_runtime_state(paths: S2AppPaths) -> str:
-    win64 = paths.win64
+    win64 = paths.binaries_dir
+    runtime_root = paths.ue4ss_runtime_root
     ue4ss_root = paths.ue4ss_root
-    if win64 is None:
+    if win64 is None and runtime_root is None:
         return "install not configured"
+    marker_roots = [root for root in (runtime_root, win64) if root is not None]
     markers = [
-        win64 / "UE4SS.dll",
-        win64 / "dwmapi.dll",
-        win64 / "xinput1_3.dll",
+        root / name
+        for root in marker_roots
+        for name in ("UE4SS.dll", "dwmapi.dll", "xinput1_3.dll")
+    ] + [
         ue4ss_root / "UE4SS.dll" if ue4ss_root else None,
     ]
     present = [path.name for path in markers if path is not None and path.exists()]

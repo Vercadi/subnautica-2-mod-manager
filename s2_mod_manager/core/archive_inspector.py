@@ -27,6 +27,7 @@ from ..models.archive_info import (
 )
 from ..utils.hashing import hash_file
 from .archive_handler import archive_support_status, is_supported_archive, open_archive
+from .pak_targets import pak_component_target_hint, pak_file_target_hint
 from .review_policy import review_required_warning
 
 UE4SS_CORE_NAMES = {
@@ -39,7 +40,7 @@ UE4SS_CORE_NAMES = {
 }
 UE4SS_MOD_MARKERS = {"enabled.txt", "settings.ini", "main.lua"}
 UE4SS_MOD_FOLDER_MARKERS = {"scripts", "dlls"}
-UE4SS_RESERVED_ROOTS = {"subnautica2", "engine", "content", "binaries", "win64", "ue4ss", "paks"}
+UE4SS_RESERVED_ROOTS = {"subnautica2", "engine", "content", "binaries", "win64", "wingdk", "ue4ss", "paks", "logicmods", "~mods"}
 UE4SS_PROTECTED_NATIVE_MOD_NAMES = {
     "bpml_genericfunctions",
     "bpmodloadermod",
@@ -49,6 +50,10 @@ UE4SS_PROTECTED_NATIVE_MOD_NAMES = {
     "keybinds",
     "consolecommands",
 }
+UE4SS_RUNTIME_GUIDANCE = (
+    "Requires UE4SS runtime. Import/add a UE4SS Runtime package to this profile, "
+    "or install UE4SS manually first."
+)
 
 
 def scan_inbox(inbox_dir: Path | None) -> list[ScanResult]:
@@ -267,7 +272,7 @@ def _detect_ue4ss_runtime(entries: list[ScanEntry], used_paths: set[str]) -> Sca
             for entry in runtime_files
         ],
         badges=["Runtime", "UE4SS"],
-        target_hint=r"Subnautica2\Binaries\Win64",
+        target_hint=r"Detected UE4SS runtime target",
     )
 
 
@@ -312,8 +317,8 @@ def _detect_ue4ss_mods(entries: list[ScanEntry], used_paths: set[str], default_m
                     for entry, rel in members
                 ],
                 badges=badges,
-                target_hint=rf"Subnautica2\Binaries\Win64\ue4ss\Mods\{mod_name}",
-                dependency_warnings=["Requires UE4SS runtime to be installed first."],
+                target_hint=rf"Detected UE4SS target\ue4ss\Mods\{mod_name}",
+                dependency_warnings=[UE4SS_RUNTIME_GUIDANCE],
                 warnings=warnings,
             )
         )
@@ -342,7 +347,8 @@ def _detect_pak_bundles(entries: list[ScanEntry], used_paths: set[str]) -> list[
         files = [pak] + companions
         for entry in files:
             used_paths.add(entry.path)
-        display = _display_name(PurePosixPath(_pak_relative_path(pak.path)).stem)
+        pak_relative = _pak_relative_path(pak.path)
+        display = _display_name(PurePosixPath(pak_relative).stem)
         components.append(
             ScannedComponent(
                 component_id=_new_id("pak"),
@@ -353,13 +359,13 @@ def _detect_pak_bundles(entries: list[ScanEntry], used_paths: set[str]) -> list[
                     ComponentFile(
                         entry.path,
                         role="pak" if entry.is_pak else "companion",
-                        target_hint=PurePosixPath(_pak_relative_path(entry.path)).name,
+                        target_hint=pak_file_target_hint(_pak_relative_path(entry.path)),
                         size=entry.size,
                     )
                     for entry in files
                 ],
                 badges=["Pak"],
-                target_hint=r"Subnautica2\Content\Paks\~mods",
+                target_hint=pak_component_target_hint(pak_relative),
             )
         )
     return components
@@ -377,12 +383,34 @@ def _is_safe_relative_path(value: str) -> bool:
 
 def _runtime_relative_path(value: str) -> str | None:
     parts = PurePosixPath(value.replace("\\", "/")).parts
-    for marker in (("Subnautica2", "Binaries", "Win64"), ("Binaries", "Win64"), ("Win64",)):
+    for marker in (
+        ("Content", "Subnautica2", "Binaries", "WinGDK"),
+        ("Subnautica2", "Binaries", "WinGDK"),
+    ):
+        rel = _parts_after(parts, marker)
+        if rel:
+            return str(PurePosixPath("Subnautica2", "Binaries", "WinGDK", *rel))
+    for marker in (
+        ("Subnautica2", "Binaries", "Win64"),
+        ("Binaries", "WinGDK"),
+        ("Binaries", "Win64"),
+        ("WinGDK",),
+        ("Win64",),
+    ):
         rel = _parts_after(parts, marker)
         if rel:
             return str(PurePosixPath(*rel))
     stripped = _strip_wrapper(value)
     stripped_parts = PurePosixPath(stripped).parts
+    content_ue4ss = _parts_after(stripped_parts, ("Content", "ue4ss"))
+    if content_ue4ss:
+        return str(PurePosixPath("ue4ss", *content_ue4ss))
+    if (
+        len(stripped_parts) >= 2
+        and stripped_parts[0].casefold() == "content"
+        and stripped_parts[-1].casefold() in UE4SS_CORE_NAMES
+    ):
+        return str(PurePosixPath(*stripped_parts[1:]))
     if stripped_parts and (stripped_parts[0].casefold() == "ue4ss" or stripped_parts[-1].casefold() in UE4SS_CORE_NAMES):
         return str(PurePosixPath(*stripped_parts))
     return None

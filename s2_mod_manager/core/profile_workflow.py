@@ -8,6 +8,12 @@ from ..models.profile import ModProfile
 from .review_policy import review_policy_for_component
 
 
+UE4SS_RUNTIME_PROFILE_GUIDANCE = (
+    "Requires UE4SS runtime. Import/add a UE4SS Runtime package to this profile, "
+    "or install UE4SS manually first."
+)
+
+
 @dataclass(frozen=True)
 class LoadoutWarning:
     component_id: str
@@ -67,7 +73,7 @@ def build_loadout_warnings(
             warnings.append(
                 LoadoutWarning(
                     component.component_id,
-                    "UE4SS mod is enabled without a UE4SS runtime in the profile or install.",
+                    UE4SS_RUNTIME_PROFILE_GUIDANCE,
                 )
             )
     return _dedupe_warnings(warnings)

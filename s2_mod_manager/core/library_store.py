@@ -4,9 +4,11 @@ import shutil
 from pathlib import Path
 
 from ..models.archive_info import SOURCE_LOCAL_FILES, ScanResult, ScannedComponent
+from ..models.archive_info import COMPONENT_PAK_BUNDLE
 from ..models.library import LibraryComponent, LibrarySource, LibraryState
 from ..utils.hashing import hash_file
 from ..utils.json_io import read_json, write_json
+from .pak_targets import pak_component_target_hint, pak_file_target_hint
 
 
 class LibraryStore:
@@ -22,6 +24,8 @@ class LibraryStore:
         self.sources_dir = self.library_dir / "sources"
         self.state_path = self.library_dir / "library_state.json"
         self.state = LibraryState.from_dict(read_json(self.state_path))
+        if self._normalize_pak_targets():
+            self.save()
 
     def list_sources(self) -> list[LibrarySource]:
         return list(self.state.sources)
@@ -110,6 +114,25 @@ class LibraryStore:
         if added:
             source.component_ids = _dedupe(source.component_ids)
             self.save()
+
+    def _normalize_pak_targets(self) -> bool:
+        changed = False
+        for component in self.state.components:
+            if component.component_type != COMPONENT_PAK_BUNDLE:
+                continue
+            pak_file = next((file for file in component.files if file.role == "pak"), None)
+            source_hint = pak_file.target_hint if pak_file is not None else component.target_hint
+            if pak_file is not None:
+                target_hint = pak_component_target_hint(source_hint or pak_file.source_path)
+                if component.target_hint != target_hint:
+                    component.target_hint = target_hint
+                    changed = True
+            for file in component.files:
+                normalized = pak_file_target_hint(file.target_hint or file.source_path)
+                if file.target_hint != normalized:
+                    file.target_hint = normalized
+                    changed = True
+        return changed
 
 
 def _copy_source(source: Path, destination: Path) -> None:

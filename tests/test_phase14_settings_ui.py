@@ -28,7 +28,7 @@ def test_settings_view_model_reports_paths_archive_support_and_safety(tmp_path: 
     assert view.install_valid
     assert "Valid S2 install" in view.install_status_text
     assert ".zip: available" in view.archive_support_text
-    assert "Real apply: enabled for non-blocked Apply Preview plans" in view.safety.text
+    assert "Real apply: enabled for non-blocked Preview & Apply plans" in view.safety.text
     assert "manifest-tracked managed files" in view.safety.text
     assert "preview-only" in view.safety.text
 

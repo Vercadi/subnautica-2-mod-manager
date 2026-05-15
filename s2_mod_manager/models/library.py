@@ -7,6 +7,13 @@ from typing import Any
 from .archive_info import ComponentFile, ScannedComponent
 
 
+OLD_UE4SS_RUNTIME_WARNING = "Requires UE4SS runtime to be installed first."
+UE4SS_RUNTIME_LIBRARY_GUIDANCE = (
+    "Requires UE4SS runtime. Import/add a UE4SS Runtime package to this profile, "
+    "or install UE4SS manually first."
+)
+
+
 def _path_to_str(path: Path | None) -> str:
     return str(path) if path else ""
 
@@ -126,7 +133,7 @@ class LibraryComponent:
                 for item in data.get("files", [])
                 if isinstance(item, dict)
             ],
-            warnings=[str(value) for value in data.get("warnings", []) if value],
+            warnings=[_normalize_warning(str(value)) for value in data.get("warnings", []) if value],
         )
 
     @classmethod
@@ -141,7 +148,10 @@ class LibraryComponent:
             target_hint=component.target_hint,
             file_count=component.file_count,
             files=[LibraryComponentFile.from_scan_file(file) for file in component.files],
-            warnings=list(component.warnings) + list(component.dependency_warnings),
+            warnings=[
+                _normalize_warning(value)
+                for value in list(component.warnings) + list(component.dependency_warnings)
+            ],
         )
 
 
@@ -172,3 +182,7 @@ class LibraryState:
                 if isinstance(item, dict)
             ],
         )
+
+
+def _normalize_warning(value: str) -> str:
+    return UE4SS_RUNTIME_LIBRARY_GUIDANCE if value == OLD_UE4SS_RUNTIME_WARNING else value

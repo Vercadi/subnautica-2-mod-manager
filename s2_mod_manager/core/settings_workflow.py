@@ -8,7 +8,7 @@ from ..models.app_paths import S2AppPaths
 from ..models.preferences import UserPreferences
 from ..models.settings_view import SettingsSafetyState, SettingsUpdateResult, SettingsView
 from .archive_handler import archive_support_status
-from .discovery import discover_all, validate_client_root
+from .discovery import discover_all, validate_install_path
 from .settings_store import load_preferences, save_preferences, save_settings
 
 
@@ -25,13 +25,19 @@ def build_settings_view(
         app_name=__app_name__,
         app_version=__version__,
         install_path=paths.client_root,
-        install_valid=validate_client_root(paths.client_root),
+        install_valid=paths.has_valid_layout,
         steam_status=_steam_status(paths),
         build_status=paths.build_summary,
         inbox_path=paths.archive_inbox_dir,
         data_dir=data_dir,
         library_dir=library_dir,
         backup_dir=backup_dir,
+        install_variant=paths.install_variant_label,
+        project_root=paths.project_root,
+        binaries_dir=paths.binaries_dir,
+        pak_dir=paths.content_paks,
+        ue4ss_target_dir=paths.ue4ss_mods,
+        gamepass_experimental=paths.is_gamepass_experimental,
         archive_support=archive_support_status(),
         auto_check_updates=preferences.auto_check_updates,
         show_update_popups=preferences.show_update_popups,
@@ -54,10 +60,11 @@ def update_manual_install_path(
     backup_dir: Path,
 ) -> SettingsUpdateResult:
     selected_root = Path(selected_root)
-    if not validate_client_root(selected_root):
+    validation = validate_install_path(selected_root)
+    if not validation.ok:
         return SettingsUpdateResult(
             ok=False,
-            message=f"Invalid Subnautica 2 install path refused: {selected_root}",
+            message=validation.message,
             paths=current_paths,
         )
     updated, messages = discover_all(
@@ -69,7 +76,7 @@ def update_manual_install_path(
     save_settings(settings_path, updated)
     return SettingsUpdateResult(
         ok=True,
-        message=f"Saved Subnautica 2 install path: {selected_root}",
+        message=f"Saved Subnautica 2 install path: {updated.client_root} ({updated.install_variant_label})",
         paths=updated,
         discovery_messages=messages,
     )

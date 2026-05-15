@@ -98,7 +98,7 @@ def test_first_run_messages_explain_release_safety_and_support_reports(tmp_path:
     messages = prepare_first_run_state(dirs, dirs.data_dir / "settings.json")
     text = "\n".join(messages)
 
-    assert "Apply Preview writes only non-blocked managed files" in text
+    assert "Preview & Apply writes only non-blocked managed files" in text
     assert "Loose root overlays" in text
     assert "Support reports are local text only" in text
 

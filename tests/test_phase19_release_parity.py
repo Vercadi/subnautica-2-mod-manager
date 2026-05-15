@@ -7,6 +7,7 @@ from pathlib import Path
 
 from s2_mod_manager.core.activity_log import ActivityLog
 from s2_mod_manager.core.archive_inspector import inspect_archive
+from s2_mod_manager.core.discovery import normalize_install_path
 from s2_mod_manager.core.help_about import build_help_about_view
 from s2_mod_manager.core.needs_attention import build_needs_attention
 from s2_mod_manager.core.settings_store import load_preferences, load_settings, save_preferences, save_settings
@@ -148,6 +149,24 @@ def test_needs_attention_summarizes_actionable_release_state(tmp_path: Path) -> 
     assert "Recovery" in text
 
 
+def test_needs_attention_reports_gamepass_experimental_layout(tmp_path: Path) -> None:
+    paths = _gamepass_paths(tmp_path)
+
+    summary = build_needs_attention(
+        paths=paths,
+        scans=[],
+        library_sources=[],
+        library_components=[],
+        loadout_warnings=[],
+        deployment_plan=None,
+        recovery_summary=RecoverySummary(),
+    )
+
+    text = summary.detail_text()
+    assert "Game Pass layout" in text
+    assert "experimental" in text.casefold()
+
+
 def test_ue4ss_native_warning_and_root_scripts_wrapping(tmp_path: Path) -> None:
     native = _archive(tmp_path / "ConsoleCommands.zip", {"ConsoleCommands/scripts/main.lua": b"-- lua"})
     root_scripts = _archive(tmp_path / "RootLua.zip", {"scripts/main.lua": b"-- lua", "scripts/config.lua": b"return {}"})
@@ -195,3 +214,15 @@ def _archive(path: Path, members: dict[str, bytes]) -> Path:
         for name, data in members.items():
             archive.writestr(name, data)
     return path
+
+
+def _gamepass_paths(tmp_path: Path) -> S2AppPaths:
+    root = tmp_path / "XboxGames" / "Subnautica 2"
+    project = root / "Content" / "Subnautica2"
+    wingdk = project / "Binaries" / "WinGDK"
+    wingdk.mkdir(parents=True, exist_ok=True)
+    (project / "Content" / "Paks").mkdir(parents=True, exist_ok=True)
+    (wingdk / "Subnautica2-WinGDK-Shipping.exe").write_bytes(b"shipping")
+    layout = normalize_install_path(wingdk)
+    assert layout is not None
+    return S2AppPaths(client_root=layout.client_root, install_layout=layout)

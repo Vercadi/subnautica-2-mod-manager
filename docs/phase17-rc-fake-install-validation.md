@@ -31,7 +31,8 @@ The safe sample profile excluded loose overlay components and executed against t
 
 Verified target families:
 
-- Pak bundles deploy to `Subnautica2\Content\Paks\~mods`.
+- `_P` patch pak bundles deploy to `Subnautica2\Content\Paks\~mods`.
+- Non-`_P` UE4SS logic pak bundles deploy to `Subnautica2\Content\Paks\LogicMods`.
 - UE4SS runtime deploys to `Subnautica2\Binaries\Win64`.
 - UE4SS mods deploy to `Subnautica2\Binaries\Win64\ue4ss\Mods\<ModName>`.
 - Wrapped UE4SS sibling files deploy under the detected mod folder.
@@ -42,10 +43,12 @@ Verified target families:
 - Recovery restore-vanilla preview no longer treats uninstalled manifest records as managed ownership.
 - Missing/non-existing manifest targets are not shown as currently managed restore-preview files.
 - Restored pre-existing files now appear as unknown files after uninstall, which better matches actual ownership.
+- SeaSprint-style non-`_P` pak bundles now target `LogicMods` instead of `~mods`.
 
 ## New Regression Coverage
 
 - Real-sample-shaped fake install apply, manifest, backup, uninstall, and restore preview.
+- LogicMods target mapping for SeaSprint-style pak bundles.
 - Blocked `SN2P`-style loose overlay refusal before writes.
 - Non-test install guard refusal with real-sample-shaped safe components.
 - Restore preview state after uninstall.

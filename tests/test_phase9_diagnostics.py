@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from s2_mod_manager.core.diagnostics import collect_diagnostics, read_log_excerpt, redact_path
+from s2_mod_manager.core.discovery import normalize_install_path
 from s2_mod_manager.core.library_store import LibraryStore
 from s2_mod_manager.core.manifest_store import ManifestStore
 from s2_mod_manager.core.profile_store import ProfileStore
@@ -161,6 +162,30 @@ def test_support_report_does_not_expose_save_or_home_paths(tmp_path: Path) -> No
     assert "slot" not in text
 
 
+def test_diagnostics_report_includes_gamepass_experimental_layout(tmp_path: Path) -> None:
+    paths = _gamepass_paths(tmp_path)
+
+    report = collect_diagnostics(
+        paths=paths,
+        data_dir=tmp_path / "data",
+        library_store=LibraryStore(tmp_path / "data"),
+        profile_store=ProfileStore(tmp_path / "data"),
+        manifest_store=ManifestStore(tmp_path / "data"),
+        deployment_plan=None,
+        recovery_summary=RecoverySummary(),
+        log_path=None,
+        home=tmp_path / "Users" / "Alice",
+    )
+
+    text = report.support_report_text()
+    assert report.install_variant == "Game Pass WinGDK (experimental)"
+    assert "WinGDK" in text
+    assert "UE4SS Runtime Root" in text
+    assert "experimental" in text.casefold()
+    assert "UE4SS Target Folder" in text
+    assert "WinGDK\\ue4ss\\Mods" in text
+
+
 def _paths(tmp_path: Path) -> S2AppPaths:
     root = tmp_path / "SteamLibrary" / "steamapps" / "common" / "Subnautica2"
     win64 = root / "Subnautica2" / "Binaries" / "Win64"
@@ -176,6 +201,18 @@ def _paths(tmp_path: Path) -> S2AppPaths:
         client_manifest=manifest,
         game_version=S2GameVersion(build_number="34", changelist="113109"),
     )
+
+
+def _gamepass_paths(tmp_path: Path) -> S2AppPaths:
+    root = tmp_path / "XboxGames" / "Subnautica 2"
+    project = root / "Content" / "Subnautica2"
+    wingdk = project / "Binaries" / "WinGDK"
+    wingdk.mkdir(parents=True, exist_ok=True)
+    (project / "Content" / "Paks").mkdir(parents=True, exist_ok=True)
+    (wingdk / "Subnautica2-WinGDK-Shipping.exe").write_bytes(b"shipping")
+    layout = normalize_install_path(wingdk)
+    assert layout is not None
+    return S2AppPaths(client_root=layout.client_root, install_layout=layout)
 
 
 def _source(tmp_path: Path) -> LibrarySource:

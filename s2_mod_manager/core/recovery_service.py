@@ -63,7 +63,7 @@ class RecoveryService:
 
     def restore_vanilla_preview(self, paths: S2AppPaths) -> RestoreVanillaPreview:
         managed = _manifest_targets(self.manifest_store.list_installs())
-        roots = [path for path in (paths.mods_paks, paths.ue4ss_mods) if path is not None]
+        roots = [path for path in (paths.mods_paks, paths.logic_mods, paths.ue4ss_mods) if path is not None]
         unknown: list[Path] = []
         for root in roots:
             if not root.is_dir():

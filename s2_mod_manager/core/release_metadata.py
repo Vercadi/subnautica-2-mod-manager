@@ -18,7 +18,7 @@ def build_release_metadata() -> dict[str, Any]:
         "platform": platform.platform(),
         "package_kind": "portable-pyinstaller",
         "safety_defaults": {
-            "real_apply": "enabled_for_non_blocked_apply_preview_plans",
+            "real_apply": "enabled_for_non_blocked_preview_apply_plans",
             "destructive_recovery": "manifest_tracked_managed_files_only",
             "restore_vanilla": "preview_only",
             "quarantine": "preview_only",

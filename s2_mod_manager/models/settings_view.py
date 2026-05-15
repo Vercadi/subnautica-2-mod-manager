@@ -9,7 +9,7 @@ from .preferences import POPUP_POLICY_LABELS, POPUP_POLICY_OPTIONS, popup_policy
 
 @dataclass(frozen=True)
 class SettingsSafetyState:
-    real_apply: str = "enabled for non-blocked Apply Preview plans"
+    real_apply: str = "enabled for non-blocked Preview & Apply plans"
     destructive_recovery: str = "enabled only for manifest-tracked managed files"
     restore_vanilla: str = "preview-only; never deletes saves"
     quarantine: str = "preview-only; unknown files are reported, not moved"
@@ -36,6 +36,12 @@ class SettingsView:
     data_dir: Path
     library_dir: Path
     backup_dir: Path
+    install_variant: str = "Unknown/manual"
+    project_root: Path | None = None
+    binaries_dir: Path | None = None
+    pak_dir: Path | None = None
+    ue4ss_target_dir: Path | None = None
+    gamepass_experimental: bool = False
     archive_support: dict[str, bool] = field(default_factory=dict)
     auto_check_updates: bool = False
     show_update_popups: bool = True
@@ -51,8 +57,26 @@ class SettingsView:
     @property
     def install_status_text(self) -> str:
         if self.install_valid and self.install_path:
-            return f"Valid S2 install: {self.install_path}"
+            text = f"Valid S2 install: {self.install_path} ({self.install_variant})"
+            if self.gamepass_experimental:
+                text += " - experimental Game Pass support"
+            return text
         return "Subnautica 2 install not configured or invalid."
+
+    @property
+    def install_layout_text(self) -> str:
+        if not self.install_valid:
+            return "Layout: not configured"
+        bits = [f"Variant: {self.install_variant}"]
+        if self.project_root:
+            bits.append(f"Project: {self.project_root}")
+        if self.binaries_dir:
+            bits.append(f"Binaries: {self.binaries_dir}")
+        if self.pak_dir:
+            bits.append(f"Paks: {self.pak_dir}")
+        if self.ue4ss_target_dir:
+            bits.append(f"UE4SS Mods: {self.ue4ss_target_dir}")
+        return "\n".join(bits)
 
     @property
     def about_text(self) -> str:
@@ -100,13 +124,14 @@ class SettingsView:
             f"enabled.txt={'on' if self.ue4ss_write_enabled_txt else 'off'}, "
             f"mods.json={'on' if self.ue4ss_write_mods_json else 'off'}, "
             f"mods.txt={'on' if self.ue4ss_write_mods_txt else 'off'}; "
-            "writes stay guarded by Apply Preview"
+            "writes stay guarded by Preview & Apply"
         )
 
     @property
     def summary_text(self) -> str:
         return (
             f"Settings: install={'valid' if self.install_valid else 'invalid'}, "
+            f"variant={self.install_variant}, "
             f"inbox={self.inbox_path or 'not set'}, "
             f"archives=({self.archive_support_text}), startup_updates={'on' if self.auto_check_updates else 'off'}, "
             f"popups=({self.popup_text}), ue4ss=({self.ue4ss_policy_text})"

@@ -17,6 +17,7 @@ class ModInspector(ctk.CTkFrame):
         mod: PlaceholderMod,
         ue4ss_policy: dict[str, bool] | None = None,
         on_toggle_ue4ss_policy=None,
+        on_preview_deployment=None,
     ):
         colors = tokens.colors
         super().__init__(
@@ -31,6 +32,7 @@ class ModInspector(ctk.CTkFrame):
         self.mod = mod
         self.ue4ss_policy = dict(ue4ss_policy or {})
         self.on_toggle_ue4ss_policy = on_toggle_ue4ss_policy
+        self.on_preview_deployment = on_preview_deployment
         self.title_label: ctk.CTkLabel | None = None
         self.subtitle_label: ctk.CTkLabel | None = None
         self.metadata_labels: dict[str, ctk.CTkLabel] = {}
@@ -50,7 +52,7 @@ class ModInspector(ctk.CTkFrame):
         if self.title_label is not None:
             self.title_label.configure(text=_fit_text(f"{self.mod.name}  *", 42))
         if self.subtitle_label is not None:
-            self.subtitle_label.configure(text=_fit_text(f"{self.mod.version}     {self.mod.state.replace('_', ' ').title()}", 48))
+            self.subtitle_label.configure(text=_fit_text(f"{self.mod.version}     {_state_label(self.mod)}", 48))
         for label, value in _metadata_values(self.mod):
             widget = self.metadata_labels.get(label)
             if widget is not None:
@@ -74,7 +76,7 @@ class ModInspector(ctk.CTkFrame):
         self.title_label.grid(row=0, column=0, sticky="ew", padx=16, pady=(14, 0))
         self.subtitle_label = ctk.CTkLabel(
             self,
-            text=_fit_text(f"{self.mod.version}     {self.mod.state.replace('_', ' ').title()}", 48),
+            text=_fit_text(f"{self.mod.version}     {_state_label(self.mod)}", 48),
             font=(t.font_family, t.small),
             text_color=c.text_secondary,
             anchor="w",
@@ -105,20 +107,21 @@ class ModInspector(ctk.CTkFrame):
         actions.grid_columnconfigure((0, 1), weight=1)
         ctk.CTkButton(
             actions,
-            text="Use Apply Preview",
+            text="Preview & Apply Profile",
             height=40,
-            fg_color=c.disabled,
-            hover_color=c.disabled,
+            fg_color=c.glass_cyan if self.on_preview_deployment else c.disabled,
+            hover_color=c.panel_glass_hover if self.on_preview_deployment else c.disabled,
             border_width=1,
-            border_color=c.border_soft,
+            border_color=c.shell_border if self.on_preview_deployment else c.border_soft,
             corner_radius=t.button_radius,
-            text_color=c.text_muted,
+            text_color=c.text_primary if self.on_preview_deployment else c.text_muted,
             font=(t.font_family, t.body, "bold"),
-            state="disabled",
+            state="normal" if self.on_preview_deployment else "disabled",
+            command=self._preview_apply,
         ).grid(row=0, column=0, sticky="ew", padx=(0, 6))
         ctk.CTkButton(
             actions,
-            text="Profile Toggles Only",
+            text="Managed Profile",
             height=40,
             fg_color=c.glass_navy,
             hover_color=c.glass_navy,
@@ -222,6 +225,10 @@ class ModInspector(ctk.CTkFrame):
         if isinstance(updated, dict):
             self.ue4ss_policy = dict(updated)
 
+    def _preview_apply(self) -> None:
+        if self.on_preview_deployment:
+            self.on_preview_deployment()
+
 
 class _Preview(tk.Canvas):
     def __init__(self, master, *, tokens: UiTokens, color: str):
@@ -270,7 +277,7 @@ def _ue4ss_text(mod: PlaceholderMod) -> str:
         "",
         "Notes:",
         "- These toggles persist manager policy only.",
-        "- Apply Preview writes managed activation files only when the plan is not blocked.",
+        "- Preview & Apply writes managed activation files only when the plan is not blocked.",
         "- Mod config/settings editing should be added per-file once deployed/imported config shapes are known.",
         "- Root scripts/ folders still require review before layout rewrite.",
         "",
@@ -292,14 +299,14 @@ def _ue4ss_text(mod: PlaceholderMod) -> str:
 
 def _profile_status(mod: PlaceholderMod) -> str:
     if not mod.in_active_profile:
-        return f"Not in {mod.profile_name or 'active profile'}"
-    state = "enabled" if mod.profile_enabled else "disabled"
-    return f"{mod.profile_name or 'Active profile'} #{mod.profile_order + 1} ({state})"
+        return "Not in Profile"
+    state = "Enabled" if mod.profile_enabled else "Disabled"
+    return f"{state} in {mod.profile_name or 'Active Profile'} #{mod.profile_order + 1}"
 
 
 def _metadata_values(mod: PlaceholderMod) -> tuple[tuple[str, str], ...]:
     return (
-        ("State", mod.state.replace("_", " ").title()),
+        ("State", _state_label(mod)),
         ("Source", mod.source_name or "Placeholder"),
         ("Profile", _profile_status(mod)),
         ("Files", str(mod.file_count or len(mod.files) or "n/a")),
@@ -333,3 +340,15 @@ def _metadata_row(parent, tokens: UiTokens, label: str, value: str) -> ctk.CTkLa
     )
     value_label.grid(row=0, column=1, sticky="ew")
     return value_label
+
+
+def _state_label(mod: PlaceholderMod) -> str:
+    if mod.review_policy_text or mod.warning or mod.profile_warning:
+        return "Needs Review"
+    if mod.in_active_profile:
+        return "Enabled" if mod.profile_enabled else "Disabled"
+    if mod.state == "library":
+        return "Imported"
+    if mod.state.startswith("candidate"):
+        return "Ready to Import"
+    return mod.state.replace("_", " ").title()

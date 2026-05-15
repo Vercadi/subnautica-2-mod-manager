@@ -10,6 +10,13 @@ class DiagnosticsReport:
     install_root: str
     build_summary: str
     steam_manifest_status: str
+    install_variant: str = "Unknown/manual"
+    project_root: str = ""
+    binaries_dir: str = ""
+    pak_dir: str = ""
+    ue4ss_runtime_dir: str = ""
+    ue4ss_target_dir: str = ""
+    experimental_warning: str = ""
     archive_support: dict[str, bool] = field(default_factory=dict)
     library_source_count: int = 0
     library_component_count: int = 0
@@ -21,7 +28,7 @@ class DiagnosticsReport:
     manifest_install_count: int = 0
     backup_count: int = 0
     ue4ss_runtime_state: str = "unknown"
-    safety_summary: str = "managed apply enabled through Apply Preview; recovery uses manifest-tracked files only; loose overlays review-required"
+    safety_summary: str = "managed apply enabled through Preview & Apply; recovery uses manifest-tracked files only; loose overlays review-required"
     app_data_dir: str = ""
     log_excerpt: list[str] = field(default_factory=list)
 
@@ -33,7 +40,7 @@ class DiagnosticsReport:
         )
         return (
             f"Diagnostics: install={'detected' if self.install_detected else 'missing'}, "
-            f"build={self.build_summary}, archives=[{archive_bits}], "
+            f"variant={self.install_variant}, build={self.build_summary}, archives=[{archive_bits}], "
             f"library={self.library_source_count}/{self.library_component_count}, "
             f"profiles={self.profile_count}, manifest={self.manifest_install_count}, "
             f"backups={self.backup_count}, ue4ss={self.ue4ss_runtime_state}, safety=guarded."
@@ -45,6 +52,13 @@ class DiagnosticsReport:
             f"App Version: {self.app_version}",
             f"Install Detected: {self.install_detected}",
             f"Install Root: {self.install_root}",
+            f"Install Variant: {self.install_variant}",
+            f"Project Root: {self.project_root}",
+            f"Binaries Folder: {self.binaries_dir}",
+            f"Pak Folder: {self.pak_dir}",
+            f"UE4SS Runtime Root: {self.ue4ss_runtime_dir}",
+            f"UE4SS Target Folder: {self.ue4ss_target_dir}",
+            f"Experimental Warning: {self.experimental_warning or 'none'}",
             f"Build: {self.build_summary}",
             f"Steam Manifest: {self.steam_manifest_status}",
             "Archive Support:",
