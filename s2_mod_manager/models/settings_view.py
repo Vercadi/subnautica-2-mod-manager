@@ -9,7 +9,7 @@ from .preferences import POPUP_POLICY_LABELS, POPUP_POLICY_OPTIONS, popup_policy
 
 @dataclass(frozen=True)
 class SettingsSafetyState:
-    real_apply: str = "enabled for non-blocked Preview & Apply plans"
+    real_apply: str = "enabled for non-blocked Apply plans"
     destructive_recovery: str = "enabled only for manifest-tracked managed files"
     restore_vanilla: str = "preview-only; never deletes saves"
     quarantine: str = "preview-only; unknown files are reported, not moved"
@@ -44,10 +44,10 @@ class SettingsView:
     gamepass_experimental: bool = False
     archive_support: dict[str, bool] = field(default_factory=dict)
     auto_check_updates: bool = True
-    show_update_popups: bool = True
-    show_info_popups: bool = True
-    show_success_popups: bool = True
-    show_warning_popups: bool = True
+    show_update_popups: bool = False
+    show_info_popups: bool = False
+    show_success_popups: bool = False
+    show_warning_popups: bool = False
     ue4ss_write_enabled_txt: bool = True
     ue4ss_write_mods_json: bool = False
     ue4ss_write_mods_txt: bool = False
@@ -116,7 +116,7 @@ class SettingsView:
 
     @property
     def popup_text(self) -> str:
-        return f"{self.popup_policy_label}; critical safety confirmations are always shown"
+        return f"{self.popup_policy_label}; critical safety confirmations still show"
 
     @property
     def ue4ss_policy_text(self) -> str:
@@ -124,7 +124,7 @@ class SettingsView:
             f"enabled.txt={'on' if self.ue4ss_write_enabled_txt else 'off'}, "
             f"mods.json={'on' if self.ue4ss_write_mods_json else 'off'}, "
             f"mods.txt={'on' if self.ue4ss_write_mods_txt else 'off'}; "
-            "writes stay guarded by Preview & Apply"
+            "writes stay guarded by Apply"
         )
 
     @property

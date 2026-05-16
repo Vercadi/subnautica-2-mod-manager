@@ -11,7 +11,7 @@ POPUP_POLICY_CUSTOM = "custom"
 POPUP_POLICY_LABELS = {
     POPUP_POLICY_ALL: "Show all popups",
     POPUP_POLICY_WARNINGS_AND_CRITICAL: "Warnings + critical only",
-    POPUP_POLICY_CRITICAL_ONLY: "Critical safety only",
+    POPUP_POLICY_CRITICAL_ONLY: "Disable noncritical popups",
     POPUP_POLICY_CUSTOM: "Custom popup settings",
 }
 POPUP_POLICY_OPTIONS = (
@@ -34,6 +34,8 @@ def popup_policy_from_flags(*, update: bool, info: bool, success: bool, warning:
 
 def popup_policy_from_text(value: str) -> str:
     normalized = str(value or "").strip().casefold()
+    if normalized in {"critical safety only", "disable all popups", "disable non-critical popups"}:
+        return POPUP_POLICY_CRITICAL_ONLY
     for policy, label in POPUP_POLICY_LABELS.items():
         if normalized in {policy.casefold(), label.casefold()}:
             return policy
@@ -43,10 +45,10 @@ def popup_policy_from_text(value: str) -> str:
 @dataclass(frozen=True)
 class UserPreferences:
     auto_check_updates: bool = True
-    show_update_popups: bool = True
-    show_info_popups: bool = True
-    show_success_popups: bool = True
-    show_warning_popups: bool = True
+    show_update_popups: bool = False
+    show_info_popups: bool = False
+    show_success_popups: bool = False
+    show_warning_popups: bool = False
     ue4ss_write_enabled_txt: bool = True
     ue4ss_write_mods_json: bool = False
     ue4ss_write_mods_txt: bool = False
@@ -70,10 +72,10 @@ class UserPreferences:
             return cls()
         return cls(
             auto_check_updates=bool(data.get("auto_check_updates", True)),
-            show_update_popups=bool(data.get("show_update_popups", True)),
-            show_info_popups=bool(data.get("show_info_popups", True)),
-            show_success_popups=bool(data.get("show_success_popups", True)),
-            show_warning_popups=bool(data.get("show_warning_popups", True)),
+            show_update_popups=bool(data.get("show_update_popups", False)),
+            show_info_popups=bool(data.get("show_info_popups", False)),
+            show_success_popups=bool(data.get("show_success_popups", False)),
+            show_warning_popups=bool(data.get("show_warning_popups", False)),
             ue4ss_write_enabled_txt=bool(data.get("ue4ss_write_enabled_txt", True)),
             ue4ss_write_mods_json=bool(data.get("ue4ss_write_mods_json", False)),
             ue4ss_write_mods_txt=bool(data.get("ue4ss_write_mods_txt", False)),

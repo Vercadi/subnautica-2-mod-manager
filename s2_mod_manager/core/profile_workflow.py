@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from ..models.archive_info import COMPONENT_UE4SS_MOD, COMPONENT_UE4SS_RUNTIME
-from ..models.library import LibraryComponent
+from ..models.library import LibraryComponent, static_library_warnings
 from ..models.profile import ModProfile
 from .review_policy import review_policy_for_component
 
@@ -64,7 +64,7 @@ def build_loadout_warnings(
                 )
             )
             continue
-        for message in component.warnings:
+        for message in static_library_warnings(component.warnings):
             warnings.append(LoadoutWarning(component.component_id, message))
         policy = review_policy_for_component(component)
         if policy is not None:

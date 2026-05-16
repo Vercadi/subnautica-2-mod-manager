@@ -24,8 +24,8 @@ from ..core.activity_log import ActivityLog
 from ..core.backup_store import BackupStore
 from ..core.diagnostics import collect_diagnostics
 from ..core.discovery import discover_all
-from ..core.deployment_planner import build_deployment_plan
 from ..core.first_run import prepare_first_run_state
+from ..core.folder_targets import game_mods_folder_target
 from ..core.help_about import build_help_about_view
 from ..core.library_store import LibraryStore
 from ..core.library_workflow import (
@@ -74,12 +74,14 @@ from ..core.settings_workflow import (
     update_ue4ss_activation_preference,
 )
 from ..core.settings_store import load_preferences, load_settings, save_settings
+from ..core.sync_planner import build_sync_deployment_plan
 from ..core.update_checker import ReleaseInfo, UpdateCheckResult, check_for_update
 from ..models.app_state import AppRuntimeState
 from ..models.deployment import DeploymentPlan
 from ..models.diagnostics import DiagnosticsReport
 from ..models.import_review import ImportReview, ImportSelection
 from ..models.needs_attention import NeedsAttentionSummary
+from ..models.profile import VANILLA_PROFILE_ID
 from ..models.preferences import UserPreferences
 from ..models.recovery import RecoverySummary, RestoreVanillaPreview
 from .shell.background import BackgroundLayer
@@ -87,7 +89,7 @@ from .shell.command_bar import CommandBar
 from .shell.navigation import NavigationRail
 from .tabs.installed_mods_tab import InstalledModsTab, placeholder_mods_from_view_state
 from .ui_tokens import UiTokens, ui_tokens_for_size
-from .window_utils import apply_window_icon, configure_dialog, message_dialog, open_path_in_shell, report_dialog
+from .window_utils import apply_window_icon, configure_dialog, confirm_dialog, message_dialog, open_path_in_shell, report_dialog
 from .widgets.activity_dialog import ActivityDialog
 from .widgets.apply_preview_dialog import ApplyPreviewDialog
 from .widgets.help_about_dialog import HelpAboutDialog
@@ -124,7 +126,8 @@ class AppWindow(ctk.CTk):
         self.update_check_result: UpdateCheckResult | None = None
         self.needs_attention: NeedsAttentionSummary = NeedsAttentionSummary()
         self.inbox_scans = scan_inbox(self.app_state.paths.archive_inbox_dir)
-        self.library_view = build_library_view_state(self.library_store, self.inbox_scans)
+        self.hidden_inbox_hashes: set[str] = set()
+        self.library_view = build_library_view_state(self.library_store, self._visible_inbox_scans())
         self.profile_store = ProfileStore(self.dirs.data_dir)
         self.loadout_warnings: list[LoadoutWarning] = []
         self.deployment_plan: DeploymentPlan | None = None
@@ -247,11 +250,16 @@ class AppWindow(ctk.CTk):
             on_deactivate_all_profile_entries=self.deactivate_all_profile_entries,
             on_remove_all_profile_entries=self.remove_all_profile_entries,
             on_remove_selected_profile_entries=self.remove_selected_profile_entries,
+            on_remove_selected_mods=self.remove_selected_mods_from_list,
+            on_uninstall_selected_mods=self.uninstall_selected_mods,
+            on_reset_to_vanilla=self.reset_to_vanilla,
+            on_open_mods_folder=self.open_game_mods_folder,
             on_open_source=self.open_mod_source,
             on_review_warnings=self.open_warning_details,
             on_preview_deployment=self.preview_deployment,
             ue4ss_policy=self.preferences.ue4ss_activation_policy(),
             on_toggle_ue4ss_policy=self.toggle_ue4ss_activation_policy,
+            pending_change_count=self._pending_change_count(),
         )
         self.installed_tab.grid(row=1, column=1, sticky="nsew", padx=(0, 12), pady=(0, 12))
         if self.native_file_drop_available and self.installed_tab.enable_native_drop(self.open_import_review_from_drop):
@@ -328,13 +336,13 @@ class AppWindow(ctk.CTk):
         self._console_write(self._inbox_summary())
         self._record_activity("scan inbox", "completed", target=str(self.app_state.paths.archive_inbox_dir or ""), details=self.library_view.summary.text)
         if self.library_view.summary.candidate_source_count:
-            self._console_write("Inbox candidates are visible in the library list. Use Import+Enable or browse/drop for review.")
+            self._console_write("Inbox candidates are visible in the mod list. Use Install & Enable from the review dialog, or browse/drop for review.")
 
     def import_selected(self, mod: PlaceholderMod) -> None:
         if not mod.source_path:
             self._console_write("Import selected: no source selected.")
             return
-        imported = import_selected_candidates(self.library_store, self.inbox_scans, {mod.source_path})
+        imported = import_selected_candidates(self.library_store, self._visible_inbox_scans(), {mod.source_path})
         enable_result = None
         if imported:
             enable_result = enable_imported_sources(
@@ -349,7 +357,7 @@ class AppWindow(ctk.CTk):
         self._record_activity("import selected", f"{len(imported)} source(s) + enable", target=mod.name)
 
     def import_all(self) -> None:
-        imported = import_all_candidates(self.library_store, self.inbox_scans)
+        imported = import_all_candidates(self.library_store, self._visible_inbox_scans())
         enable_result = None
         if imported:
             enable_result = enable_imported_sources(
@@ -403,6 +411,9 @@ class AppWindow(ctk.CTk):
 
     def import_review_selection(self, review: ImportReview, selection: ImportSelection, *, enable: bool = False) -> None:
         imported = import_selected_review_sources(self.library_store, review, selection)
+        for source in imported:
+            if source.source_hash:
+                self.hidden_inbox_hashes.discard(source.source_hash)
         enable_result = None
         if enable and imported:
             selected_component_ids = {
@@ -449,6 +460,17 @@ class AppWindow(ctk.CTk):
             self._console_write(f"Recovery refused: {reason}")
             self._record_activity("recovery uninstall selected", "refused", details=reason)
             return reason
+        if not confirm_dialog(
+            self,
+            tokens=self.tokens,
+            title="Uninstall Selected",
+            message=(
+                f"Uninstall {len(install_ids)} selected manager-installed record(s)? "
+                "Only files recorded in install_manifest.json are removed or restored. Unknown/manual files are left alone."
+            ),
+            confirm_text="Uninstall",
+        ):
+            return "Uninstall cancelled."
         service = RecoveryService(self.manifest_store, BackupStore(self.dirs.backup_dir))
         result = service.uninstall_selected(install_ids)
         self._refresh_library_view(refresh_recovery=True, refresh_diagnostics=True)
@@ -467,6 +489,17 @@ class AppWindow(ctk.CTk):
             self._console_write(f"Recovery refused: {reason}")
             self._record_activity("recovery uninstall all", "refused", details=reason)
             return reason
+        if not confirm_dialog(
+            self,
+            tokens=self.tokens,
+            title="Uninstall All Mods",
+            message=(
+                "Uninstall all manager-installed files? Only files recorded in install_manifest.json are removed or restored. "
+                "Unknown/manual files are reported only and left alone."
+            ),
+            confirm_text="Uninstall All Mods",
+        ):
+            return "Uninstall all cancelled."
         service = RecoveryService(self.manifest_store, BackupStore(self.dirs.backup_dir))
         result = service.uninstall_all()
         self._refresh_library_view(refresh_recovery=True, refresh_diagnostics=True)
@@ -600,7 +633,7 @@ class AppWindow(ctk.CTk):
             return
         if label == "Profiles":
             self.open_profiles_dialog()
-        elif label == "Recovery":
+        elif label in {"Recovery", "Installed Files / Backups"}:
             self.open_recovery_dialog()
         elif label == "Diagnostics":
             self.open_diagnostics_dialog()
@@ -618,7 +651,7 @@ class AppWindow(ctk.CTk):
             return
         self.profile_store.set_active_profile(profile.profile_id)
         self._refresh_library_view(rebuild_library=False)
-        self._console_write(f"Active profile: {profile.name}")
+        self._console_write(f"Active profile: {profile.name}. Click Apply to update the game.")
         self._record_activity("profile", "selected", target=profile.name)
 
     def create_profile(self, name: str) -> None:
@@ -675,7 +708,7 @@ class AppWindow(ctk.CTk):
             enabled=True,
         )
         self._refresh_library_view(rebuild_library=False)
-        self._console_write(result.message)
+        self._console_write(f"{result.message} {self._pending_change_text()}")
         self._record_activity(
             "profile loadout",
             "enabled" if result.ok else "refused",
@@ -691,7 +724,7 @@ class AppWindow(ctk.CTk):
             self._console_write(str(exc))
             return
         self._refresh_library_view(rebuild_library=False)
-        self._console_write(f"Remove from profile: {'removed' if changed else 'not present'} {mod.name}")
+        self._console_write(f"Remove from profile: {'removed' if changed else 'not present'} {mod.name}. {self._pending_change_text()}")
         self._record_activity("profile loadout", "removed" if changed else "not present", target=mod.name)
 
     def toggle_profile_entry(self, mod: PlaceholderMod) -> None:
@@ -710,7 +743,7 @@ class AppWindow(ctk.CTk):
             self.library_store.list_components(),
         )
         self._refresh_library_view(rebuild_library=False)
-        self._console_write(result.message)
+        self._console_write(f"{result.message} {self._pending_change_text()}")
         self._record_activity(
             "profile loadout",
             "toggled" if result.ok else "refused",
@@ -766,7 +799,7 @@ class AppWindow(ctk.CTk):
             self._console_write(str(exc))
             return
         self._refresh_library_view(rebuild_library=False)
-        self._console_write(f"Profile selection removed: {removed} component(s) removed from {active.name}.")
+        self._console_write(f"Profile selection removed: {removed} component(s) removed from {active.name}. {self._pending_change_text()}")
         self._record_activity("profile loadout", "selection removed", target=active.name, details=f"{removed} removed")
 
     def _set_all_profile_entries(self, enabled: bool) -> None:
@@ -778,8 +811,89 @@ class AppWindow(ctk.CTk):
             return
         self._refresh_library_view(rebuild_library=False)
         state = "enabled" if enabled else "disabled"
-        self._console_write(f"Profile loadout {state}: {changed} component(s) changed in {active.name}.")
+        self._console_write(f"Profile loadout {state}: {changed} component(s) changed in {active.name}. {self._pending_change_text()}")
         self._record_activity("profile loadout", state, target=active.name, details=f"{changed} changed")
+
+    def uninstall_selected_mods(self, component_ids: list[str]) -> None:
+        component_ids = list(dict.fromkeys(component_id for component_id in component_ids if component_id))
+        if not component_ids:
+            self._console_write("Uninstall: select one or more installed mods first.")
+            return
+        if not confirm_dialog(
+            self,
+            tokens=self.tokens,
+            title="Uninstall Selected",
+            message=(
+                f"Uninstall selected manager-installed files for {len(component_ids)} mod(s)? "
+                "Only files recorded in install_manifest.json are removed or restored. Unknown/manual files are left alone."
+            ),
+            confirm_text="Uninstall",
+        ):
+            self._console_write("Uninstall selected cancelled.")
+            return
+        service = RecoveryService(self.manifest_store, BackupStore(self.dirs.backup_dir))
+        result = service.uninstall_components(component_ids)
+        self._remove_components_from_active_profile(component_ids)
+        self.hidden_inbox_hashes.update(self._source_hashes_for_components(component_ids))
+        removed_from_list = self.library_store.remove_components(component_ids)
+        self._refresh_library_view(refresh_recovery=True, refresh_diagnostics=True)
+        text = uninstall_result_text(result)
+        if removed_from_list:
+            text += f" Removed {removed_from_list} mod(s) from the manager list."
+        self._console_write(text)
+        self._console_write(self.recovery_summary.text)
+        self._record_activity("uninstall selected mods", "completed" if result.ok else "failed", details=text)
+
+    def remove_selected_mods_from_list(self, component_ids: list[str]) -> None:
+        component_ids = list(dict.fromkeys(component_id for component_id in component_ids if component_id))
+        if not component_ids:
+            self._console_write("Remove: select one or more mods first.")
+            return
+        installed = self._installed_component_ids()
+        blocked = [component_id for component_id in component_ids if component_id in installed]
+        removable = [component_id for component_id in component_ids if component_id not in installed]
+        if blocked:
+            self._console_write("Remove: installed mods need Uninstall first. Unknown/manual files are left alone.")
+        if not removable:
+            return
+        self._remove_components_from_active_profile(removable)
+        self.hidden_inbox_hashes.update(self._source_hashes_for_components(removable))
+        removed = self.library_store.remove_components(removable)
+        self._refresh_library_view(refresh_recovery=True, refresh_diagnostics=True)
+        self._console_write(f"Removed {removed} mod(s) from the manager list.")
+        self._record_activity("mod list", "removed", details=f"{removed} removed")
+
+    def _remove_components_from_active_profile(self, component_ids: list[str]) -> int:
+        active = self.profile_store.active_profile()
+        if active.protected:
+            return 0
+        removed = 0
+        for component_id in dict.fromkeys(component_ids):
+            try:
+                if self.profile_store.remove_component(active.profile_id, component_id):
+                    removed += 1
+            except ValueError:
+                break
+        return removed
+
+    def reset_to_vanilla(self) -> None:
+        if not confirm_dialog(
+            self,
+            tokens=self.tokens,
+            title="Reset to Vanilla",
+            message=(
+                "Switch to the Vanilla profile and remove manager-installed files now? "
+                "Only files recorded in install_manifest.json are removed or restored. Unknown/manual files are left alone."
+            ),
+            confirm_text="Reset to Vanilla",
+        ):
+            self._console_write("Reset to Vanilla cancelled.")
+            return
+        self.profile_store.set_active_profile(VANILLA_PROFILE_ID)
+        self._refresh_library_view(rebuild_library=False, refresh_recovery=True)
+        self._console_write(f"Active profile: Vanilla. {self._pending_change_text()}")
+        self._record_activity("profile", "reset preview", target="Vanilla")
+        self.preview_deployment()
 
     def preview_deployment(self) -> None:
         self._refresh_library_view(rebuild_library=False)
@@ -788,14 +902,16 @@ class AppWindow(ctk.CTk):
             self._console_write("Deployment preview unavailable.")
             return
         preview = build_apply_preview(plan)
-        self._console_write(f"Preview & Apply opened: {preview.summary_text}")
-        self._record_activity("apply preview", "opened", details=preview.summary_text)
-        ApplyPreviewDialog(
-            self,
-            tokens=self.tokens,
-            preview=preview,
-            on_apply=lambda: self._apply_profile_from_dialog(plan),
-        )
+        if not preview.allow_apply:
+            message = preview.disabled_reason or "No installable changes."
+            self._console_write(f"Apply skipped: {message}")
+            self._record_activity("apply", "skipped", details=message)
+            return
+        if preview.blocked:
+            self._console_write(
+                f"Apply will skip {preview.review_required_count} review-required file action(s) and install supported changes."
+            )
+        self._apply_profile_from_dialog(plan)
 
     def center_dialog(self, window, width: int, height: int, *, modal: bool = True) -> None:
         configure_dialog(window, self, width=width, height=height, modal=modal, topmost=True)
@@ -947,7 +1063,7 @@ class AppWindow(ctk.CTk):
             warnings.append(mod.review_policy_text)
         lines = [
             mod.name,
-            f"State: {'Enabled' if mod.in_active_profile and mod.profile_enabled else 'Disabled' if mod.in_active_profile else 'Imported' if mod.state == 'library' else 'Ready to Import' if mod.state.startswith('candidate') else mod.state.replace('_', ' ').title()}",
+            f"State: {'Enabled' if mod.in_active_profile and mod.profile_enabled else 'Disabled' if mod.in_active_profile else 'Installed' if mod.installed else 'Available' if mod.state == 'library' or mod.state.startswith('candidate') else mod.state.replace('_', ' ').title()}",
             f"Profile: {'Enabled in active profile' if mod.in_active_profile and mod.profile_enabled else 'Disabled in active profile' if mod.in_active_profile else 'Not in Profile'}",
             "",
             "Warnings:",
@@ -960,10 +1076,10 @@ class AppWindow(ctk.CTk):
             [
                 "",
                 "Next actions:",
-                "- Import candidates before adding them to profiles.",
+                "- Install candidates before adding them to profiles.",
                 "- Add UE4SS Runtime to the same profile before UE4SS mods when warned.",
                 "- Keep review-required loose overlays out of release profiles until manually reviewed.",
-                "- Use Preview & Apply Profile to inspect exact target paths before any guarded apply.",
+                "- Use Apply to inspect exact target paths before installing changes.",
             ]
         )
         self._record_activity("warning details", "opened", target=mod.name)
@@ -988,6 +1104,17 @@ class AppWindow(ctk.CTk):
         self._record_activity("open folder", "opened" if ok else "refused", target=str(path or ""), details=message)
         return message
 
+    def open_game_mods_folder(self) -> str:
+        target = game_mods_folder_target(self.app_state.paths)
+        ok, message = open_path_in_shell(target.path)
+        if ok:
+            message = f"Opened {target.label}: {target.path}"
+        else:
+            message = f"Open Mods Folder refused: {message}"
+        self._console_write(message)
+        self._record_activity("open mods folder", "opened" if ok else "refused", target=str(target.path or ""), details=message)
+        return message
+
     def open_release_url(self) -> None:
         if self.update_check_result and self.update_check_result.release and self.update_check_result.release.html_url:
             webbrowser.open(self.update_check_result.release.html_url)
@@ -1005,7 +1132,7 @@ class AppWindow(ctk.CTk):
         if refresh_recovery:
             self._refresh_recovery_state()
         if rebuild_library:
-            self.library_view = build_library_view_state(self.library_store, self.inbox_scans)
+            self.library_view = build_library_view_state(self.library_store, self._visible_inbox_scans())
         self.scanned_mods = self._mods_from_library_view(refresh_diagnostics=refresh_diagnostics)
         if self.installed_tab is not None:
             self.installed_tab.set_mods(self.scanned_mods, refresh_inspector=refresh_inspector)
@@ -1014,6 +1141,7 @@ class AppWindow(ctk.CTk):
                 active_profile_name=self.profile_store.active_profile().name,
                 active_profile_protected=self.profile_store.active_profile().protected,
                 profile_warning_count=len(self.loadout_warnings),
+                pending_change_count=self._pending_change_count(),
             )
 
     def _settings_view(self):
@@ -1067,6 +1195,7 @@ class AppWindow(ctk.CTk):
             profile_warnings=self._profile_warning_map(),
             deployment_status=self._deployment_status_map(),
             deployment_preview=self._preview_text(),
+            installed_component_ids=self._installed_component_ids(),
         )
 
     def _profile_warning_map(self) -> dict[str, str]:
@@ -1102,7 +1231,7 @@ class AppWindow(ctk.CTk):
     def _refresh_needs_attention(self) -> None:
         self.needs_attention = build_needs_attention(
             paths=self.app_state.paths,
-            scans=self.inbox_scans,
+            scans=self._visible_inbox_scans(),
             library_sources=self.library_store.list_sources(),
             library_components=self.library_store.list_components(),
             loadout_warnings=self.loadout_warnings,
@@ -1130,11 +1259,12 @@ class AppWindow(ctk.CTk):
         return "\n".join(lines).strip()
 
     def _build_deployment_plan(self, active_profile) -> DeploymentPlan:
-        return build_deployment_plan(
+        return build_sync_deployment_plan(
             active_profile,
             sources=self.library_store.list_sources(),
             components=self.library_store.list_components(),
             paths=self.app_state.paths,
+            installed_records=self.manifest_store.list_installs(),
             ue4ss_runtime_installed=self._ue4ss_runtime_installed(),
             dry_run=True,
             real_apply_enabled=False,
@@ -1143,11 +1273,12 @@ class AppWindow(ctk.CTk):
 
     def _build_apply_dialog_plan(self) -> DeploymentPlan | None:
         active = self.profile_store.active_profile()
-        return build_deployment_plan(
+        return build_sync_deployment_plan(
             active,
             sources=self.library_store.list_sources(),
             components=self.library_store.list_components(),
             paths=self.app_state.paths,
+            installed_records=self.manifest_store.list_installs(),
             ue4ss_runtime_installed=self._ue4ss_runtime_installed(),
             dry_run=False,
             real_apply_enabled=True,
@@ -1192,6 +1323,50 @@ class AppWindow(ctk.CTk):
             for component_id, actions in status.items()
         }
 
+    def _installed_component_ids(self) -> set[str]:
+        installed: set[str] = set()
+        for record in self.manifest_store.list_installs():
+            if record.status == "uninstalled":
+                continue
+            for deployed in record.deployed_files:
+                if deployed.action == "delete":
+                    continue
+                if deployed.component_id and deployed.target_path.exists():
+                    installed.add(deployed.component_id)
+        return installed
+
+    def _pending_change_count(self) -> int:
+        if self.deployment_plan is None:
+            return 0
+        return len(self.deployment_plan.creates) + len(self.deployment_plan.overwrites) + len(self.deployment_plan.deletes)
+
+    def _pending_change_text(self) -> str:
+        count = self._pending_change_count()
+        if count <= 0:
+            return "No pending game changes."
+        return f"{count} pending change(s). Click Apply to update the game."
+
+    def _visible_inbox_scans(self):
+        if not self.hidden_inbox_hashes:
+            return self.inbox_scans
+        return [
+            scan for scan in self.inbox_scans
+            if not scan.source_hash or scan.source_hash not in self.hidden_inbox_hashes
+        ]
+
+    def _source_hashes_for_components(self, component_ids: list[str]) -> set[str]:
+        selected = set(component_ids)
+        source_ids = {
+            component.source_id
+            for component in self.library_store.list_components()
+            if component.component_id in selected
+        }
+        return {
+            source.source_hash
+            for source in self.library_store.list_sources()
+            if source.source_id in source_ids and source.source_hash
+        }
+
     def _ue4ss_runtime_installed(self) -> bool:
         paths = self.app_state.paths
         win64 = paths.win64
@@ -1215,5 +1390,6 @@ def main() -> None:
 
 
 def _summarize_actions(actions: list[str]) -> str:
+    display = {"create": "install", "delete": "remove"}
     counts = {action: actions.count(action) for action in sorted(set(actions))}
-    return ", ".join(f"{count} {name}" for name, count in counts.items())
+    return ", ".join(f"{count} {display.get(name, name)}" for name, count in counts.items())

@@ -6,7 +6,7 @@ from ..models.archive_info import (
     COMPONENT_UE4SS_RUNTIME,
     ScanResult,
 )
-from ..models.library import LibraryComponent, LibrarySource
+from ..models.library import LibraryComponent, LibrarySource, static_library_warnings
 from ..models.library_view import LibraryDisplayItem, LibraryViewState, ScanSummary
 from .library_store import LibraryStore
 from .review_policy import review_policy_for_fields
@@ -108,7 +108,7 @@ def _candidate_items(scans: list[ScanResult], imported_hashes: set[str]) -> list
             )
             continue
         for component_index, component in enumerate(scan.components):
-            status = "Imported" if already_imported else "Ready to Import"
+            status = "Available"
             warnings = list(component.warnings) + list(component.dependency_warnings) + list(scan.warnings)
             policy = review_policy_for_fields(
                 component.component_type,
@@ -126,7 +126,7 @@ def _candidate_items(scans: list[ScanResult], imported_hashes: set[str]) -> list
                     version_label="candidate",
                     description=_candidate_description(scan.display_name, component.file_count, policy_text=policy.text if policy else ""),
                     badges=list(component.badges),
-                    status=status if not warnings else "Needs Review",
+                    status="Needs Review" if policy else status,
                     enabled=False,
                     warning="; ".join(dict.fromkeys(warnings)),
                     accent=_accent_for_component(component.component_type),
@@ -148,7 +148,8 @@ def _candidate_items(scans: list[ScanResult], imported_hashes: set[str]) -> list
 
 
 def _item_from_library_component(component: LibraryComponent, source: LibrarySource | None) -> LibraryDisplayItem:
-    warning = "; ".join(component.warnings)
+    visible_warnings = static_library_warnings(component.warnings)
+    warning = "; ".join(visible_warnings)
     policy = review_policy_for_fields(
         component.component_type,
         component.install_kind,
@@ -162,7 +163,7 @@ def _item_from_library_component(component: LibraryComponent, source: LibrarySou
         version_label="library",
         description=_library_description(component.file_count, source.display_name if source else "library source", policy_text=policy.text if policy else ""),
         badges=list(component.badges),
-        status="Imported" if not warning else "Needs Review",
+        status="Needs Review" if policy else "Available",
         enabled=True,
         warning=warning,
         accent=_accent_for_component(component.component_type),
@@ -177,7 +178,7 @@ def _item_from_library_component(component: LibraryComponent, source: LibrarySou
         target_hint=component.target_hint,
         file_count=component.file_count,
         files=[file.source_path for file in component.files],
-        source_warnings=list(component.warnings),
+        source_warnings=visible_warnings,
         review_policy_text=policy.text if policy else "",
     )
 
@@ -200,7 +201,7 @@ def _candidate_description(source_name: str, file_count: int, *, policy_text: st
 
 
 def _library_description(file_count: int, source_name: str, *, policy_text: str = "") -> str:
-    base = f"{file_count} file(s) imported from {source_name}. Ready to apply through Preview & Apply Profile."
+    base = f"{file_count} file(s) installed into the manager from {source_name}. Click Apply to update the game."
     if policy_text:
         return base + " Review-required loose overlays stay blocked from automatic apply."
     return base

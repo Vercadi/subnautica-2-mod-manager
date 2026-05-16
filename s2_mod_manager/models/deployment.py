@@ -81,8 +81,8 @@ class DeploymentPlan:
     def summary_text(self) -> str:
         state = "blocked" if self.blocked else "ready"
         return (
-            f"{self.profile_name}: {len(self.creates)} create(s), "
-            f"{len(self.overwrites)} overwrite(s), {len(self.deletes)} delete(s), {len(self.skips)} skip(s), "
+            f"{self.profile_name}: {len(self.creates)} install(s), "
+            f"{len(self.overwrites)} overwrite(s), {len(self.deletes)} remove(s), {len(self.skips)} skip(s), "
             f"{len(self.warnings)} warning(s), {len(self.errors)} error(s) - {state}"
         )
 
@@ -121,5 +121,5 @@ class DeploymentPlan:
                 lines.append(f"- ... {len(self.actions) - limit} more action(s)")
         if len(lines) == 6:
             lines.append("")
-            lines.append("No enabled imported components are ready to deploy.")
+            lines.append("No profile changes need to be applied.")
         return "\n".join(lines)

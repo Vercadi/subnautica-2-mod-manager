@@ -96,7 +96,7 @@ class ImportReviewDialog(ctk.CTkToplevel):
         ).grid(row=0, column=2, padx=(0, 8))
         ctk.CTkButton(
             footer,
-            text="Import & Enable",
+            text="Install & Enable",
             width=160,
             height=34,
             fg_color=c.glass_cyan,

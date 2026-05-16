@@ -61,7 +61,7 @@ class ImportSourceReview:
             return "Needs Review"
         if self.issue_count:
             return f"{self.issue_count} issue(s)"
-        return "Ready to Import"
+        return "Available"
 
 
 @dataclass(frozen=True)

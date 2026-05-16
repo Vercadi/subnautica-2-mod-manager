@@ -21,6 +21,22 @@ crash_reports/
 build/
 dist/
 *.egg-info/
+release-metadata.json
+
+# Local development-only material
+docs/
+screenshots/
+tests/
+design.md
+implementation-plan.md
+PACKAGING.md
+research.md
+technical-spec.md
+theme.md
+assets/README.md
+assets/app_icon_placeholder.svg
+assets/app_icon_source.png
+scripts/capture_release_screenshots.py
 
 # Local mod inbox lives beside this repo at ..\Mods
 # Do not create a second in-repo Mods folder unless the layout changes.

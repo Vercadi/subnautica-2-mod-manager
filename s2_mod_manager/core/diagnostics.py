@@ -41,7 +41,7 @@ def collect_diagnostics(
         ue4ss_runtime_dir=redact_path(paths.ue4ss_runtime_root, home=home) if paths.ue4ss_runtime_root else "not configured",
         ue4ss_target_dir=redact_path(paths.ue4ss_mods, home=home) if paths.ue4ss_mods else "not configured",
         experimental_warning=(
-            "Game Pass / WinGDK support is experimental; UE4SS base/runtime files target the Content root and standard Lua mods target WinGDK\\ue4ss\\Mods. Verify Preview & Apply targets and report crashes with a support report."
+            "Game Pass / WinGDK support is experimental; UE4SS base/runtime files target the Content root and standard Lua mods target WinGDK\\ue4ss\\Mods. Verify Apply targets and report crashes with a support report."
             if paths.is_gamepass_experimental
             else ""
         ),

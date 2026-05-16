@@ -1,8 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-label="Subnautica 2 Mod Manager placeholder icon">
-  <rect width="256" height="256" rx="48" fill="#03101A"/>
-  <circle cx="128" cy="128" r="82" fill="none" stroke="#1AC9F4" stroke-width="10"/>
-  <circle cx="128" cy="128" r="46" fill="none" stroke="#7CF7C8" stroke-width="6"/>
-  <path d="M52 154c32-28 58-41 82-39 25 2 46 20 70 55" fill="none" stroke="#38D6D6" stroke-width="9" stroke-linecap="round"/>
-  <path d="M84 86h88v72H84z" fill="#061A29" stroke="#2A6170" stroke-width="6" rx="12"/>
-  <path d="M107 110h42M107 132h28" stroke="#E7F8F8" stroke-width="8" stroke-linecap="round"/>
-</svg>

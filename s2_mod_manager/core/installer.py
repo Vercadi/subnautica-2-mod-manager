@@ -4,7 +4,7 @@ import uuid
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 
-from ..models.deployment import ACTION_BLOCKED, ACTION_CREATE, ACTION_DELETE, ACTION_OVERWRITE, DeploymentFileAction, DeploymentPlan
+from ..models.deployment import ACTION_CREATE, ACTION_DELETE, ACTION_OVERWRITE, DeploymentFileAction, DeploymentPlan
 from ..models.manifest import (
     STATUS_COMPLETED,
     STATUS_FAILED,
@@ -16,6 +16,7 @@ from ..models.manifest import (
 from .archive_handler import open_archive
 from .backup_store import BackupStore
 from .manifest_store import ManifestStore
+from .sync_planner import is_sync_delete_action
 
 
 @dataclass(frozen=True)
@@ -71,17 +72,20 @@ class Installer:
         if action.target_path is None:
             raise FileNotFoundError("planned action has no target path")
         if action.action == ACTION_DELETE:
-            backup = self.backup_store.backup_existing(
-                action.target_path,
-                install_id=record.install_id,
-                component_id=action.component_id,
-                target_root=record.target_root,
-            )
-            if backup is not None:
-                record.backups.append(backup)
-                self.manifest_store.add_or_update(record)
+            backup = None
+            if not is_sync_delete_action(action):
+                backup = self.backup_store.backup_existing(
+                    action.target_path,
+                    install_id=record.install_id,
+                    component_id=action.component_id,
+                    target_root=record.target_root,
+                )
+                if backup is not None:
+                    record.backups.append(backup)
+                    self.manifest_store.add_or_update(record)
             if action.target_path.exists():
                 action.target_path.unlink()
+                _cleanup_empty_parents(action.target_path.parent, stop_at=record.target_root)
             return DeployedFileRecord(
                 component_id=action.component_id,
                 component_name=action.component_name,
@@ -115,17 +119,27 @@ class Installer:
 
 
 def _refusal_reason(plan: DeploymentPlan, *, allow_real_apply: bool) -> str:
-    if plan.blocked:
-        return "Refusing to apply a blocked deployment plan."
+    blocking_errors = _blocking_errors(plan)
+    if blocking_errors:
+        return "Refusing to apply plan with errors: " + "; ".join(blocking_errors[:3])
     if plan.dry_run:
         return "Refusing to apply a dry-run deployment plan."
     if plan.target_root is None:
         return "Refusing to apply without a target root."
     if not allow_real_apply and not is_fake_test_install(plan.target_root):
         return "Refusing to write to a non-test install without allow_real_apply=True."
-    if any(action.action == ACTION_BLOCKED for action in plan.actions):
-        return "Refusing to apply blocked file actions."
+    if not any(action.action in {ACTION_CREATE, ACTION_OVERWRITE, ACTION_DELETE} for action in plan.actions):
+        return "Refusing to apply because there are no installable changes."
     return ""
+
+
+def _blocking_errors(plan: DeploymentPlan) -> list[str]:
+    return [error for error in plan.errors if not _is_review_only_error(error)]
+
+
+def _is_review_only_error(error: str) -> bool:
+    lowered = str(error or "").casefold()
+    return "requires manual review before deployment" in lowered or "loose overlay" in lowered
 
 
 def _action_source_bytes(action: DeploymentFileAction) -> bytes:
@@ -165,3 +179,26 @@ def _safe_member_path(root: Path, member: str) -> Path:
     except ValueError as exc:
         raise FileNotFoundError(f"unsafe source member: {member}") from exc
     return candidate
+
+
+def _cleanup_empty_parents(start: Path, *, stop_at: Path | None) -> None:
+    if stop_at is None:
+        return
+    try:
+        stop = stop_at.resolve()
+        current = start.resolve()
+    except OSError:
+        return
+    protected_names = {"content", "subnautica2", "binaries", "win64", "wingdk", "paks", "mods", "ue4ss"}
+    while current != stop:
+        if current.name.casefold() in protected_names:
+            return
+        try:
+            current.relative_to(stop)
+        except ValueError:
+            return
+        try:
+            current.rmdir()
+        except OSError:
+            return
+        current = current.parent

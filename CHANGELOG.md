@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.1.3
+
+UX simplification and profile/game sync redesign.
+
+Changed:
+
+- Main flow is now drag/drop -> Install & Enable -> Apply -> Launch.
+- Main action labels are simplified: Apply, Install, Enable, Disable, Remove, Uninstall, Reset to Vanilla.
+- Recovery / Backups is now Installed Files / Backups.
+- Mod rows now use Available, Enabled, Disabled, Installed, and Needs Review states.
+- Apply now syncs the game folder to the active profile, including removal of manager-installed files that are no longer enabled.
+- Apply skips review-required loose overlays while installing supported selected mods.
+- Added an Open Mods Folder action for the detected game-side mod target.
+
+Safety:
+
+- Unknown/manual files are still reported only and are not deleted.
+- Loose overlays remain blocked.
+- Overwrites are still backed up before install.
+- Uninstall/reset confirmations remain critical and cannot be disabled.
+
 ## 0.1.2
 
 Patch release for update visibility.

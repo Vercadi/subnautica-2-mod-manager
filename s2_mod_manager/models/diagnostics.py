@@ -28,7 +28,7 @@ class DiagnosticsReport:
     manifest_install_count: int = 0
     backup_count: int = 0
     ue4ss_runtime_state: str = "unknown"
-    safety_summary: str = "managed apply enabled through Preview & Apply; recovery uses manifest-tracked files only; loose overlays review-required"
+    safety_summary: str = "managed apply enabled through Apply; installed-file recovery uses manifest-tracked files only; loose overlays review-required"
     app_data_dir: str = ""
     log_excerpt: list[str] = field(default_factory=list)
 

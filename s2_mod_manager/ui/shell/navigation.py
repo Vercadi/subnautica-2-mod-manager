@@ -9,7 +9,7 @@ from .status_gauge import OxygenGauge
 NAV_ITEMS = (
     ("Installed Mods", "[M]"),
     ("Profiles", "[@]"),
-    ("Recovery", "[#]"),
+    ("Installed Files / Backups", "[#]"),
     ("Diagnostics", "[~]"),
     ("Activity", "[A]"),
     ("Help / Support", "[?]"),

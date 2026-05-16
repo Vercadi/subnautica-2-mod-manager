@@ -130,7 +130,7 @@ def enable_imported_sources(
     if selected_component_ids:
         component_ids = [component_id for component_id in component_ids if component_id in selected_component_ids]
     if not component_ids:
-        return ProfileActionResult(False, "Import & Enable found no imported components to enable.")
+        return ProfileActionResult(False, "Install & Enable found no imported components to enable.")
 
     messages: list[str] = []
     enabled_ids: list[str] = []
@@ -158,7 +158,7 @@ def enable_imported_sources(
 
     enabled_count = len(dict.fromkeys(enabled_ids))
     refused_count = len(dict.fromkeys(refused_ids))
-    summary = f"Import & Enable: enabled {enabled_count} component(s)"
+    summary = f"Install & Enable: enabled {enabled_count} component(s)"
     if profile is not None:
         summary += f" in {profile.name}"
     if refused_count:

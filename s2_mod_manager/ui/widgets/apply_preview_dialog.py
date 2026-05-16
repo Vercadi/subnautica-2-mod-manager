@@ -16,7 +16,7 @@ class ApplyPreviewDialog(ctk.CTkToplevel):
         self.on_apply = on_apply
         self.result_label: ctk.CTkLabel | None = None
         self.apply_button: ctk.CTkButton | None = None
-        self.title("Preview & Apply Profile")
+        self.title("Apply Changes")
         self.configure(fg_color=tokens.colors.bg_abyss)
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(1, weight=1)
@@ -37,7 +37,7 @@ class ApplyPreviewDialog(ctk.CTkToplevel):
         header.grid_columnconfigure(0, weight=1)
         ctk.CTkLabel(
             header,
-            text=f"Preview & Apply Profile: {self.preview.profile_name}",
+            text=f"Apply Changes: {self.preview.profile_name}",
             text_color=c.text_primary,
             font=(t.font_family, t.section_title, "bold"),
         ).grid(row=0, column=0, sticky="w", padx=14, pady=(10, 2))
@@ -78,7 +78,7 @@ class ApplyPreviewDialog(ctk.CTkToplevel):
         footer.grid_columnconfigure(0, weight=1)
         self.result_label = ctk.CTkLabel(
             footer,
-            text=self.preview.disabled_reason or "Managed apply is available. Review the planned file actions before continuing.",
+            text=self.preview.disabled_reason or "Ready to install. Review the planned changes before continuing.",
             text_color=c.accent_biolume if self.preview.allow_apply else c.text_muted,
             font=(t.font_family, t.small),
             anchor="w",
@@ -120,9 +120,9 @@ class ApplyPreviewDialog(ctk.CTkToplevel):
             (
                 ("Mode", self.preview.mode_text),
                 ("Blocked", self.preview.blocked_text),
-                ("Creates", str(self.preview.creates)),
-                ("Overwrites", str(self.preview.overwrites)),
-                ("Deletes", str(self.preview.deletes)),
+                ("Install", str(self.preview.creates)),
+                ("Remove", str(self.preview.deletes)),
+                ("Overwrite", str(self.preview.overwrites)),
                 ("Backups", str(self.preview.backup_count)),
                 ("Skips", str(self.preview.skips)),
                 ("Fake Test", "yes" if self.preview.fake_test_install else "no"),
@@ -204,7 +204,7 @@ class ApplyPreviewDialog(ctk.CTkToplevel):
         frame.grid_columnconfigure(2, weight=1)
         ctk.CTkLabel(frame, text="Planned File Actions", text_color=c.text_primary, font=(t.font_family, t.small, "bold")).grid(row=0, column=0, columnspan=3, sticky="w", padx=12, pady=(8, 4))
         if not self.preview.actions:
-            ctk.CTkLabel(frame, text="No enabled imported components are ready to deploy.", text_color=c.text_muted, font=(t.font_family, t.small)).grid(row=1, column=0, sticky="w", padx=12, pady=(0, 10))
+            ctk.CTkLabel(frame, text="No profile changes need to be applied.", text_color=c.text_muted, font=(t.font_family, t.small)).grid(row=1, column=0, sticky="w", padx=12, pady=(0, 10))
             return
         for index, action in enumerate(self.preview.actions[:80], start=1):
             color = c.warning if action.action in {"overwrite", "blocked", "delete"} else c.accent_biolume if action.action == "create" else c.text_secondary
@@ -231,4 +231,4 @@ class ApplyPreviewDialog(ctk.CTkToplevel):
         if self.result_label is not None:
             self.result_label.configure(text=result)
         if self.apply_button is not None:
-            self.apply_button.configure(state="disabled", text="Applied / Recorded", fg_color=self.tokens.colors.disabled)
+            self.apply_button.configure(state="disabled", text="Installed / Recorded", fg_color=self.tokens.colors.disabled)

@@ -18,7 +18,7 @@ The app imports mods into a manager-owned library, lets users build profiles, pr
 - Protected Vanilla profile plus editable modded profiles
 - Enable/disable controls and bulk profile actions
 - UE4SS activation file support for `enabled.txt`, `mods.txt`, and `mods.json`
-- Primary Preview & Apply Profile flow with exact creates, overwrites, skips, warnings, errors, and blocked actions
+- Primary Apply flow with exact installs, removals, overwrites, skips, warnings, errors, and blocked actions
 - Manifest-backed managed install, uninstall, backup, and recovery
 - Diagnostics, redacted support report generation, and activity logging
 - Portable PyInstaller build with Subnautica-inspired UI
@@ -57,7 +57,7 @@ Review-required layouts are detected but blocked from automatic apply:
 
 ## Safety Model
 
-Supported managed mods can be installed through Preview & Apply Profile. The preview shows exactly what will be created, overwritten, skipped, or blocked before applying a profile.
+Supported managed mods can be installed through Apply. The preview shows exactly what will be installed, removed, overwritten, skipped, or blocked before changing the game folder.
 
 Pak target policy:
 
@@ -65,7 +65,7 @@ Pak target policy:
 - UE4SS Blueprint/logic pak bundles without `_P`, such as SeaSprint, deploy to `Subnautica2\Content\Paks\LogicMods`.
 - Archives that already include `Content\Paks\LogicMods` or `Content\Paks\~mods` keep that target folder.
 
-Every managed apply is recorded in `install_manifest.json`. If an existing managed target is overwritten, the original file is backed up first. Recovery and uninstall actions only touch files recorded in the manager manifest. Unknown files are reported, not deleted.
+Every managed apply is recorded in `install_manifest.json`. If an existing managed target is overwritten, the original file is backed up first. Apply also removes manager-installed files that no longer belong to the active profile. Installed Files / Backups and uninstall actions only touch files recorded in the manager manifest. Unknown files are reported, not deleted.
 
 ## Install From Source
 
@@ -74,11 +74,10 @@ pip install -r requirements.txt
 python app.py
 ```
 
-## Smoke Checks
+## Smoke Check
 
 ```powershell
-python -m compileall app.py s2_mod_manager tests
-python -m pytest -q
+python -m compileall app.py s2_mod_manager
 ```
 
 ## Portable Build
@@ -88,16 +87,12 @@ python -m pytest -q
 .\scripts\package_release.ps1
 ```
 
-The release zip is written to `dist\release`.
+The release zip is written to `dist\release`. Public download zips are attached to GitHub Releases, not committed to the repository.
 
 ## Documentation
 
-- [PACKAGING.md](PACKAGING.md) - build and reset notes
 - [PRIVACY.md](PRIVACY.md) - local data and support-report privacy
 - [CHANGELOG.md](CHANGELOG.md) - release changes
-- [docs/nexus-release-guide.md](docs/nexus-release-guide.md) - Nexus-facing user guide
-- [docs/release-notes-v0.1.2.md](docs/release-notes-v0.1.2.md) - current release notes
-- [docs/release-checklist.md](docs/release-checklist.md) - final manual release checks
 
 ## Project Layout
 
@@ -107,9 +102,8 @@ S2 Mod Manager/
   Mod Manager/
     app.py
     s2_mod_manager/
-    tests/
     assets/
-    docs/
+    scripts/
 ```
 
 `..\Mods\` is treated as the local import inbox beside the app project. The Git repo lives in `Mod Manager/`.

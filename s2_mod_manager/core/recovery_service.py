@@ -35,7 +35,7 @@ class RecoveryService:
         installs = self.manifest_store.list_installs()
         return RecoverySummary(
             install_count=len(installs),
-            deployed_file_count=sum(len(record.deployed_files) for record in installs),
+            deployed_file_count=sum(len(_active_deployed_files(record)) for record in installs),
             backup_count=sum(len(record.backups) for record in installs),
             completed_count=sum(1 for record in installs if record.status == STATUS_COMPLETED),
             failed_count=sum(1 for record in installs if record.status == STATUS_FAILED),
@@ -57,9 +57,31 @@ class RecoveryService:
         ids = [
             record.install_id
             for record in self.manifest_store.list_installs()
-            if record.deployed_files and record.status != STATUS_UNINSTALLED
+            if _active_deployed_files(record) and record.status != STATUS_UNINSTALLED
         ]
         return self.uninstall_selected(ids)
+
+    def uninstall_components(self, component_ids: list[str]) -> UninstallResult:
+        selected = set(component_ids)
+        result = UninstallResult(install_ids=[])
+        if not selected:
+            return result
+        for record in self.manifest_store.list_installs():
+            if record.status == STATUS_UNINSTALLED:
+                continue
+            matching = [deployed for deployed in record.deployed_files if deployed.component_id in selected]
+            if not matching:
+                continue
+            result.install_ids.append(record.install_id)
+            self._uninstall_files(record, list(reversed(matching)), result)
+            remaining = [deployed for deployed in record.deployed_files if deployed.component_id not in selected]
+            record.deployed_files = remaining
+            if not remaining:
+                record.status = STATUS_UNINSTALLED
+                record.finished_at = record.finished_at or record.started_at
+            self.manifest_store.add_or_update(record)
+        self.manifest_store.save()
+        return result
 
     def restore_vanilla_preview(self, paths: S2AppPaths) -> RestoreVanillaPreview:
         managed = _manifest_targets(self.manifest_store.list_installs())
@@ -79,8 +101,14 @@ class RecoveryService:
         )
 
     def _uninstall_record(self, record: InstallRecord, result: UninstallResult) -> None:
+        self._uninstall_files(record, list(reversed(record.deployed_files)), result)
+        record.status = STATUS_UNINSTALLED
+        record.finished_at = record.finished_at or record.started_at
+        self.manifest_store.add_or_update(record)
+
+    def _uninstall_files(self, record: InstallRecord, deployed_files, result: UninstallResult) -> None:
         backups_by_id = {backup.backup_id: backup for backup in record.backups if backup.backup_id}
-        for deployed in reversed(record.deployed_files):
+        for deployed in deployed_files:
             target = deployed.target_path
             backup = backups_by_id.get(deployed.backup_id)
             try:
@@ -97,14 +125,12 @@ class RecoveryService:
                     continue
                 if target.exists():
                     target.unlink()
+                    _cleanup_empty_parents(target.parent, stop_at=record.target_root)
                     result.removed_files.append(target)
                 else:
                     result.missing_files.append(target)
             except OSError as exc:
                 result.errors.append(f"{target}: {exc}")
-        record.status = STATUS_UNINSTALLED
-        record.finished_at = record.finished_at or record.started_at
-        self.manifest_store.add_or_update(record)
 
 
 def _manifest_targets(records: list[InstallRecord]) -> set[Path]:
@@ -116,3 +142,36 @@ def _manifest_targets(records: list[InstallRecord]) -> set[Path]:
             if deployed.target_path and deployed.target_path.exists():
                 targets.add(deployed.target_path)
     return targets
+
+
+def _active_deployed_files(record: InstallRecord):
+    if record.status == STATUS_UNINSTALLED:
+        return []
+    return [
+        deployed
+        for deployed in record.deployed_files
+        if deployed.action != "delete" and deployed.target_path and deployed.target_path.exists()
+    ]
+
+
+def _cleanup_empty_parents(start: Path, *, stop_at: Path | None) -> None:
+    if stop_at is None:
+        return
+    try:
+        stop = stop_at.resolve()
+        current = start.resolve()
+    except OSError:
+        return
+    protected_names = {"content", "subnautica2", "binaries", "win64", "wingdk", "paks", "mods", "ue4ss"}
+    while current != stop:
+        if current.name.casefold() in protected_names:
+            return
+        try:
+            current.relative_to(stop)
+        except ValueError:
+            return
+        try:
+            current.rmdir()
+        except OSError:
+            return
+        current = current.parent

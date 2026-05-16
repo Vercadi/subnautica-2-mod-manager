@@ -20,7 +20,7 @@ class RecoveryDialog(ctk.CTkToplevel):
         self.on_create_backup = on_create_backup
         self.record_vars: dict[str, tk.BooleanVar] = {}
         self.result_label: ctk.CTkLabel | None = None
-        self.title("Recovery / Backups")
+        self.title("Installed Files / Backups")
         self.configure(fg_color=tokens.colors.bg_abyss)
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(1, weight=1)
@@ -41,12 +41,12 @@ class RecoveryDialog(ctk.CTkToplevel):
         header.grid_columnconfigure(0, weight=1)
         ctk.CTkLabel(
             header,
-            text="Recovery / Backups",
+            text="Installed Files / Backups",
             text_color=c.text_primary,
             font=(t.font_family, t.section_title, "bold"),
         ).grid(row=0, column=0, sticky="w", padx=14, pady=(10, 2))
         recovery_enabled = self.view.action_state.allow_uninstall_selected or self.view.action_state.allow_uninstall_all
-        mode = "managed recovery enabled" if recovery_enabled else "no managed recovery actions"
+        mode = "installed-file actions available" if recovery_enabled else "no installed-file actions"
         ctk.CTkLabel(
             header,
             text=f"{mode} | {self.view.summary_text}",
@@ -76,7 +76,7 @@ class RecoveryDialog(ctk.CTkToplevel):
         footer.grid_columnconfigure(0, weight=1)
         self.result_label = ctk.CTkLabel(
             footer,
-            text=self.view.action_state.disabled_reason or "Managed uninstall actions are available. Unknown files are left alone.",
+            text=self.view.action_state.disabled_reason or "Uninstall actions use install_manifest.json only. Unknown files are left alone.",
             text_color=c.accent_biolume if recovery_enabled else c.text_muted,
             font=(t.font_family, t.small),
             anchor="w",
@@ -108,7 +108,7 @@ class RecoveryDialog(ctk.CTkToplevel):
         ).grid(row=0, column=2, padx=(0, 8))
         ctk.CTkButton(
             footer,
-            text="Uninstall Selected Managed",
+            text="Uninstall Selected",
             width=178,
             height=34,
             fg_color=c.glass_cyan if self.view.action_state.allow_uninstall_selected else c.disabled,
@@ -121,7 +121,7 @@ class RecoveryDialog(ctk.CTkToplevel):
         ).grid(row=0, column=3, padx=(0, 8))
         ctk.CTkButton(
             footer,
-            text="Uninstall All Managed",
+            text="Uninstall All Mods",
             width=150,
             height=34,
             fg_color=c.glass_cyan if self.view.action_state.allow_uninstall_all else c.disabled,

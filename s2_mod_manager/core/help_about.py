@@ -37,6 +37,9 @@ def build_help_about_view(
         kofi_url=KOFI_URL,
         shortcuts=[
             _shortcut("Game Install", paths.client_root),
+            _shortcut("UE4SS Mods", paths.ue4ss_mods),
+            _shortcut("Pak Mods", paths.mods_paks),
+            _shortcut("LogicMods", paths.logic_mods),
             _shortcut("Mods Inbox", paths.archive_inbox_dir),
             _shortcut("Manager Data", data_dir),
             _shortcut("Library", library_dir),

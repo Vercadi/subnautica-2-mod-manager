@@ -107,7 +107,7 @@ class ModInspector(ctk.CTkFrame):
         actions.grid_columnconfigure((0, 1), weight=1)
         ctk.CTkButton(
             actions,
-            text="Preview & Apply Profile",
+            text="Apply",
             height=40,
             fg_color=c.glass_cyan if self.on_preview_deployment else c.disabled,
             hover_color=c.panel_glass_hover if self.on_preview_deployment else c.disabled,
@@ -121,7 +121,7 @@ class ModInspector(ctk.CTkFrame):
         ).grid(row=0, column=0, sticky="ew", padx=(0, 6))
         ctk.CTkButton(
             actions,
-            text="Managed Profile",
+            text="Profile Changes",
             height=40,
             fg_color=c.glass_navy,
             hover_color=c.glass_navy,
@@ -277,7 +277,7 @@ def _ue4ss_text(mod: PlaceholderMod) -> str:
         "",
         "Notes:",
         "- These toggles persist manager policy only.",
-        "- Preview & Apply writes managed activation files only when the plan is not blocked.",
+        "- Apply writes managed activation files only when the plan is not blocked.",
         "- Mod config/settings editing should be added per-file once deployed/imported config shapes are known.",
         "- Root scripts/ folders still require review before layout rewrite.",
         "",
@@ -343,12 +343,14 @@ def _metadata_row(parent, tokens: UiTokens, label: str, value: str) -> ctk.CTkLa
 
 
 def _state_label(mod: PlaceholderMod) -> str:
-    if mod.review_policy_text or mod.warning or mod.profile_warning:
+    if mod.review_policy_text:
         return "Needs Review"
     if mod.in_active_profile:
         return "Enabled" if mod.profile_enabled else "Disabled"
+    if mod.installed:
+        return "Installed"
     if mod.state == "library":
-        return "Imported"
+        return "Available"
     if mod.state.startswith("candidate"):
-        return "Ready to Import"
+        return "Available"
     return mod.state.replace("_", " ").title()

@@ -41,7 +41,7 @@ def can_execute_recovery_action(view: RecoveryView, install_ids: list[str]) -> t
 def uninstall_result_text(result: UninstallResult) -> str:
     status = "completed" if result.ok else "completed with errors"
     return (
-        f"Recovery uninstall {status}: {len(result.install_ids)} record(s), "
+        f"Uninstall {status}: {len(result.install_ids)} record(s), "
         f"{len(result.removed_files)} removed, {len(result.restored_files)} restored, "
         f"{len(result.missing_files)} missing, {len(result.errors)} error(s)."
     )
@@ -56,12 +56,17 @@ def restore_preview_text(preview: RestoreVanillaPreview) -> str:
 
 
 def _record_view(record: InstallRecord) -> RecoveryRecordView:
+    active_files = [
+        deployed
+        for deployed in record.deployed_files
+        if deployed.action != "delete" and deployed.target_path and deployed.target_path.exists()
+    ]
     return RecoveryRecordView(
         install_id=record.install_id,
         status=record.status,
         profile_name=record.profile_name,
         target_root=record.target_root,
-        deployed_file_count=len(record.deployed_files),
+        deployed_file_count=len(active_files),
         backup_count=len(record.backups),
         warning_count=len(record.warnings),
         error_count=len(record.errors),

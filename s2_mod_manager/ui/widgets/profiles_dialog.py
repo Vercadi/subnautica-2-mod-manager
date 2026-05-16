@@ -59,7 +59,7 @@ class ProfilesDialog(ctk.CTkToplevel):
         ).pack(anchor="w", padx=14, pady=(10, 2))
         ctk.CTkLabel(
             header,
-            text="Choose which manager-side profile is active. Profile switches do not write to the game install.",
+            text="Choose the active profile. Switching profiles does not change game files until you click Apply.",
             text_color=c.text_secondary,
             font=(t.font_family, t.small),
         ).pack(anchor="w", padx=14, pady=(0, 10))
@@ -82,7 +82,7 @@ class ProfilesDialog(ctk.CTkToplevel):
         footer.grid_columnconfigure(0, weight=1)
         self.result_label = ctk.CTkLabel(
             footer,
-            text=f"Active profile: {self.get_active_profile().name}",
+            text=f"Active profile: {self.get_active_profile().name}. Click Apply to update the game.",
             text_color=c.text_muted,
             font=(t.font_family, t.small),
             anchor="w",
@@ -155,7 +155,7 @@ class ProfilesDialog(ctk.CTkToplevel):
             font=(t.font_family, t.body, "bold"),
             anchor="w",
         ).grid(row=0, column=1, sticky="ew", padx=(0, 8), pady=(8, 0))
-        mode = "protected vanilla baseline" if profile.protected else "editable"
+        mode = "Vanilla: no manager-installed mods after Apply/Reset" if profile.protected else "editable modded profile"
         ctk.CTkLabel(
             frame,
             text=f"{mode} | {len(profile.entries)} component(s)",

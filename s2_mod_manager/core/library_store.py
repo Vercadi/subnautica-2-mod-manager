@@ -33,6 +33,31 @@ class LibraryStore:
     def list_components(self) -> list[LibraryComponent]:
         return list(self.state.components)
 
+    def remove_components(self, component_ids: list[str], *, delete_sources_when_empty: bool = True) -> int:
+        selected = set(component_ids)
+        if not selected:
+            return 0
+        before = len(self.state.components)
+        removed_components = [component for component in self.state.components if component.component_id in selected]
+        self.state.components = [component for component in self.state.components if component.component_id not in selected]
+        for source in self.state.sources:
+            source.component_ids = [component_id for component_id in source.component_ids if component_id not in selected]
+        if delete_sources_when_empty:
+            removed_source_paths: list[Path] = []
+            kept_sources: list[LibrarySource] = []
+            for source in self.state.sources:
+                if source.component_ids:
+                    kept_sources.append(source)
+                else:
+                    removed_source_paths.append(source.managed_path)
+            self.state.sources = kept_sources
+            for path in removed_source_paths:
+                _remove_path(path)
+        removed = before - len(self.state.components)
+        if removed or removed_components:
+            self.save()
+        return removed
+
     def import_scan(self, scan: ScanResult) -> LibrarySource | None:
         if not scan.ok or not scan.components:
             return None
@@ -143,6 +168,16 @@ def _copy_source(source: Path, destination: Path) -> None:
     else:
         destination.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(source, destination)
+
+
+def _remove_path(path: Path) -> None:
+    try:
+        if path.is_dir():
+            shutil.rmtree(path)
+        elif path.exists():
+            path.unlink()
+    except OSError:
+        pass
 
 
 def _copy_sources(sources: list[Path], destination: Path, *, source_kind: str = "") -> None:

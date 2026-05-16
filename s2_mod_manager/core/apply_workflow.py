@@ -10,7 +10,7 @@ from .review_policy import loose_overlay_policy
 def build_apply_preview(plan: DeploymentPlan) -> ApplyPreview:
     fake = is_fake_test_install(plan.target_root)
     has_executable_actions = bool(plan.creates or plan.overwrites or plan.deletes)
-    allow_apply = bool(plan.real_apply_enabled) and not plan.blocked and not plan.dry_run and has_executable_actions
+    allow_apply = bool(plan.real_apply_enabled) and not plan.dry_run and has_executable_actions and not _has_blocking_errors(plan)
     disabled_reason = _disabled_reason(plan, fake=fake, allow_apply=allow_apply)
     blocked_actions = [action for action in plan.actions if action.action == ACTION_BLOCKED]
     review_policy = loose_overlay_policy(target_hints=[action.target_display for action in blocked_actions]) if blocked_actions else None
@@ -22,7 +22,7 @@ def build_apply_preview(plan: DeploymentPlan) -> ApplyPreview:
         fake_test_install=fake,
         allow_apply=allow_apply,
         disabled_reason=disabled_reason,
-        blocked=plan.blocked,
+        blocked=bool(blocked_actions or _has_blocking_errors(plan)),
         creates=len(plan.creates),
         overwrites=len(plan.overwrites),
         deletes=len(plan.deletes),
@@ -60,19 +60,33 @@ def apply_result_text(ok: bool, status: str, deployed_count: int, backup_count: 
 def _disabled_reason(plan: DeploymentPlan, *, fake: bool, allow_apply: bool) -> str:
     if allow_apply:
         return ""
-    if plan.blocked:
-        if plan.blocked_actions:
-            return (
-                "Plan is blocked by review-required loose overlay actions. "
-                "These files target unmanaged root paths and need manual review before any install."
-            )
-        return "Plan is blocked by errors or review-required file actions."
+    blocking_errors = _blocking_errors(plan)
+    if blocking_errors:
+        return "Plan has errors that must be fixed before install: " + "; ".join(blocking_errors[:3])
+    if plan.blocked_actions:
+        return (
+            "Only review-required items are selected. manual review is needed for blocked loose overlays; "
+            "select at least one supported mod, or remove the blocked item."
+        )
     if plan.dry_run and fake:
         return "Preview is dry-run only; build an execution plan for the fake test install to apply."
     if plan.dry_run:
-        return "Preview is dry-run only; open Preview & Apply Profile to build an executable managed plan."
+        return "Preview is dry-run only; click Apply to review and install changes."
     if not plan.real_apply_enabled:
         return "Apply is disabled for this plan."
     if not (plan.creates or plan.overwrites or plan.deletes):
-        return "No enabled imported components are ready to apply."
+        return "No profile changes need to be applied."
     return "Apply is not available for this plan."
+
+
+def _has_blocking_errors(plan: DeploymentPlan) -> bool:
+    return bool(_blocking_errors(plan))
+
+
+def _blocking_errors(plan: DeploymentPlan) -> list[str]:
+    return [error for error in plan.errors if not _is_review_only_error(error)]
+
+
+def _is_review_only_error(error: str) -> bool:
+    lowered = str(error or "").casefold()
+    return "requires manual review before deployment" in lowered or "loose overlay" in lowered

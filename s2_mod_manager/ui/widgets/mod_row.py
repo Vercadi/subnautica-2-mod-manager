@@ -39,6 +39,7 @@ class PlaceholderMod:
     profile_warning: str = ""
     deployment_status: str = ""
     deployment_preview: str = ""
+    installed: bool = False
 
 
 class ModRow(ctk.CTkFrame):
@@ -432,18 +433,21 @@ def _row_badges(mod: PlaceholderMod, tokens: UiTokens) -> list[tuple[str, str]]:
     c = tokens.colors
     badges: list[tuple[str, str]] = [(mod.status, _status_color(mod.status, tokens))]
     if mod.in_active_profile:
-        badges.append((f"Loadout #{mod.profile_order + 1}", c.glass_cyan))
-        badges.append(("On" if mod.profile_enabled else "Off", c.chip_green if mod.profile_enabled else c.disabled))
+        badges.append(("Enabled" if mod.profile_enabled else "Disabled", c.chip_green if mod.profile_enabled else c.disabled))
+    elif mod.installed:
+        badges.append(("Installed", c.chip_blue))
     elif mod.state == "library":
-        badges.append(("Imported", c.chip_green))
+        badges.append(("Available", c.chip_green))
     elif mod.state.startswith("candidate"):
-        badges.append(("Ready", c.chip_orange))
+        badges.append(("Available", c.chip_orange))
     for badge in mod.badges:
         badges.append((badge, _badge_color(badge, tokens)))
     if mod.deployment_status:
         badges.append((f"Plan {mod.deployment_status}", c.chip_blue))
-    if mod.warning or mod.profile_warning:
+    if mod.review_policy_text:
         badges.append(("Needs Review", c.chip_orange))
+    elif mod.warning or mod.profile_warning:
+        badges.append(("Warning", c.chip_orange))
     if len(badges) > 6:
         return badges[:5] + [(f"+{len(badges) - 5}", c.border_cold)]
     return badges
@@ -490,10 +494,12 @@ def _compact_summary(mod: PlaceholderMod) -> str:
     pieces = []
     if mod.in_active_profile:
         pieces.append(f"{mod.profile_name or 'Profile'}: {'Enabled' if mod.profile_enabled else 'Disabled'}")
+    elif mod.installed:
+        pieces.append("Installed")
     elif mod.state == "library":
-        pieces.append("Imported")
+        pieces.append("Available")
     elif mod.state.startswith("candidate"):
-        pieces.append("Ready to Import")
+        pieces.append("Available")
     else:
         pieces.append(mod.state.replace("_", " ").title())
     if mod.component_type:
@@ -507,10 +513,12 @@ def _compact_summary(mod: PlaceholderMod) -> str:
 
 def _compact_status_color(mod: PlaceholderMod, tokens: UiTokens) -> str:
     c = tokens.colors
-    if mod.warning or mod.profile_warning:
+    if mod.review_policy_text:
         return c.warning
     if mod.in_active_profile:
         return c.accent_biolume if mod.profile_enabled else c.disabled
+    if mod.installed:
+        return c.chip_blue
     if mod.state == "library":
         return c.accent_lagoon
     if mod.state.startswith("candidate"):
@@ -522,10 +530,12 @@ def _compact_badges(mod: PlaceholderMod) -> str:
     values = []
     if mod.in_active_profile:
         values.append("ENABLED" if mod.profile_enabled else "DISABLED")
+    elif mod.installed:
+        values.append("INSTALLED")
     elif mod.state.startswith("candidate"):
-        values.append("READY")
+        values.append("AVAILABLE")
     elif mod.state == "library":
-        values.append("IMPORTED")
+        values.append("AVAILABLE")
     values.extend(str(value).upper() for value in mod.badges[:2])
     return " / ".join(dict.fromkeys(values))
 

@@ -43,7 +43,7 @@ class ApplyPreview:
 
     @property
     def backup_count(self) -> int:
-        return self.overwrites + self.deletes
+        return self.overwrites
 
     @property
     def mode_text(self) -> str:
@@ -60,8 +60,8 @@ class ApplyPreview:
     @property
     def summary_text(self) -> str:
         return (
-            f"{self.profile_name}: {self.creates} create(s), {self.overwrites} overwrite(s), "
-            f"{self.deletes} delete(s), "
+            f"{self.profile_name}: {self.creates} install(s), {self.deletes} remove(s), "
+            f"{self.overwrites} overwrite(s), "
             f"{self.skips} skip(s), {len(self.warnings)} warning(s), {len(self.errors)} error(s), "
             f"{self.backup_count} backup(s) - {self.blocked_text}"
         )
@@ -69,7 +69,7 @@ class ApplyPreview:
     @property
     def apply_button_text(self) -> str:
         if self.allow_apply:
-            return "Apply To Test Install" if self.fake_test_install else "Apply Profile"
+            return "Reset to Vanilla" if self.profile_name == "Vanilla" and self.deletes else "Install"
         if self.blocked:
-            return "Apply Blocked"
-        return "Apply Disabled"
+            return "Blocked"
+        return "Disabled"

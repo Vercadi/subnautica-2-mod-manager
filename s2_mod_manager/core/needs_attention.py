@@ -3,7 +3,7 @@ from __future__ import annotations
 from ..models.app_paths import S2AppPaths
 from ..models.archive_info import ScanResult
 from ..models.deployment import DeploymentPlan
-from ..models.library import LibraryComponent, LibrarySource
+from ..models.library import LibraryComponent, LibrarySource, static_library_warnings
 from ..models.needs_attention import AttentionItem, NeedsAttentionSummary
 from ..models.recovery import RecoverySummary
 from .archive_handler import archive_support_status
@@ -56,7 +56,7 @@ def build_needs_attention(
         policy = review_policy_for_component(component)
         if policy is not None:
             items.append(AttentionItem("Review required", f"{component.display_name}: {policy.title}.", "warning"))
-        for warning in component.warnings[:2]:
+        for warning in static_library_warnings(component.warnings)[:2]:
             items.append(AttentionItem("Library warning", f"{component.display_name}: {warning}", "warning"))
 
     for warning in loadout_warnings:
@@ -64,11 +64,12 @@ def build_needs_attention(
 
     if deployment_plan is not None:
         for error in deployment_plan.errors[:4]:
-            items.append(AttentionItem("Apply preview", error, "error"))
+            severity = "warning" if _is_review_only_error(error) else "error"
+            items.append(AttentionItem("Apply", error, severity))
         for warning in deployment_plan.warnings[:4]:
-            items.append(AttentionItem("Apply preview", warning, "warning"))
-        if deployment_plan.blocked:
-            items.append(AttentionItem("Apply blocked", "The active profile has blocked or review-required actions.", "warning"))
+            items.append(AttentionItem("Apply", warning, "warning"))
+        if deployment_plan.blocked_actions:
+            items.append(AttentionItem("Skipped on Apply", "Review-required loose overlays will be skipped while supported mods install.", "warning"))
 
     if recovery_summary.failed_count:
         items.append(AttentionItem("Recovery", f"{recovery_summary.failed_count} failed install record(s) need review.", "warning"))
@@ -91,3 +92,8 @@ def _dedupe(items: list[AttentionItem]) -> list[AttentionItem]:
         seen.add(key)
         output.append(item)
     return output
+
+
+def _is_review_only_error(error: str) -> bool:
+    lowered = str(error or "").casefold()
+    return "requires manual review before deployment" in lowered or "loose overlay" in lowered

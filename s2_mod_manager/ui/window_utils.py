@@ -52,17 +52,26 @@ def configure_dialog(
     modal: bool = True,
     topmost: bool = False,
 ) -> None:
+    try:
+        master = master.winfo_toplevel()
+    except Exception:
+        pass
     apply_window_icon(window, master)
     if min_width is not None or min_height is not None:
         window.minsize(min_width or width, min_height or height)
     try:
         master.update_idletasks()
         window.update_idletasks()
+        parent_width = master.winfo_width()
+        parent_height = master.winfo_height()
+        if parent_width <= 1 or parent_height <= 1:
+            parent_width = master.winfo_reqwidth()
+            parent_height = master.winfo_reqheight()
         placement = centered_placement(
             parent_x=master.winfo_rootx(),
             parent_y=master.winfo_rooty(),
-            parent_width=master.winfo_width(),
-            parent_height=master.winfo_height(),
+            parent_width=parent_width,
+            parent_height=parent_height,
             width=width,
             height=height,
             screen_width=window.winfo_screenwidth(),
@@ -87,6 +96,7 @@ def configure_dialog(
         except Exception:
             pass
     try:
+        window.lift(master)
         window.focus()
     except Exception:
         pass
@@ -339,6 +349,92 @@ def prompt_dialog(
     entry.focus_set()
     dialog.wait_window()
     return result["value"]
+
+
+def confirm_dialog(
+    master,
+    *,
+    tokens,
+    title: str,
+    message: str,
+    confirm_text: str = "Continue",
+    cancel_text: str = "Cancel",
+    width: int = 560,
+    height: int = 280,
+) -> bool:
+    dialog = ctk.CTkToplevel(master)
+    dialog.title(title)
+    c = tokens.colors
+    result: dict[str, bool] = {"ok": False}
+    dialog.configure(fg_color=c.bg_abyss)
+    dialog.grid_columnconfigure(0, weight=1)
+    dialog.grid_rowconfigure(0, weight=1)
+    frame = ctk.CTkFrame(
+        dialog,
+        fg_color=c.glass_black,
+        corner_radius=tokens.panel_radius,
+        border_width=1,
+        border_color=c.shell_border_dim,
+    )
+    frame.grid(row=0, column=0, sticky="nsew", padx=14, pady=14)
+    frame.grid_columnconfigure(0, weight=1)
+    ctk.CTkLabel(
+        frame,
+        text=title,
+        text_color=c.text_primary,
+        font=(tokens.font_family, tokens.section_title, "bold"),
+        anchor="w",
+    ).grid(row=0, column=0, sticky="ew", padx=14, pady=(14, 4))
+    ctk.CTkLabel(
+        frame,
+        text=message,
+        text_color=c.text_secondary,
+        font=(tokens.font_family, tokens.small),
+        wraplength=max(260, width - 80),
+        justify="left",
+        anchor="w",
+    ).grid(row=1, column=0, sticky="nsew", padx=14, pady=(0, 14))
+    buttons = ctk.CTkFrame(frame, fg_color="transparent")
+    buttons.grid(row=2, column=0, sticky="ew", padx=14, pady=(0, 14))
+    buttons.grid_columnconfigure(0, weight=1)
+
+    def _confirm(_event=None) -> None:
+        result["ok"] = True
+        dialog.destroy()
+
+    def _cancel(_event=None) -> None:
+        result["ok"] = False
+        dialog.destroy()
+
+    ctk.CTkButton(
+        buttons,
+        text=cancel_text,
+        width=110,
+        height=34,
+        fg_color=c.glass_navy,
+        hover_color=c.panel_glass,
+        border_width=1,
+        border_color=c.border_cold,
+        text_color=c.text_secondary,
+        command=_cancel,
+    ).grid(row=0, column=1, padx=(0, 8))
+    ctk.CTkButton(
+        buttons,
+        text=confirm_text,
+        width=150,
+        height=34,
+        fg_color=c.glass_cyan,
+        hover_color=c.panel_glass_hover,
+        border_width=1,
+        border_color=c.shell_border,
+        text_color=c.text_primary,
+        command=_confirm,
+    ).grid(row=0, column=2)
+    dialog.bind("<Return>", _confirm)
+    dialog.bind("<Escape>", _cancel)
+    configure_dialog(dialog, master, width=width, height=height, min_width=420, min_height=220, modal=True, topmost=True)
+    dialog.wait_window()
+    return result["ok"]
 
 
 def report_dialog(

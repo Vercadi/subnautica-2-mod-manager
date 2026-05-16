@@ -17,7 +17,7 @@ class RecoverySummary:
     @property
     def text(self) -> str:
         return (
-            f"Recovery: {self.install_count} install record(s), "
+            f"Installed files/backups: {self.install_count} install record(s), "
             f"{self.deployed_file_count} deployed file(s), "
             f"{self.backup_count} backup(s), "
             f"{self.completed_count} completed, {self.failed_count} failed, "

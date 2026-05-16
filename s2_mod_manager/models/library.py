@@ -14,6 +14,19 @@ UE4SS_RUNTIME_LIBRARY_GUIDANCE = (
 )
 
 
+def is_ue4ss_runtime_dependency_warning(value: str) -> bool:
+    return _normalize_warning(str(value or "")) == UE4SS_RUNTIME_LIBRARY_GUIDANCE
+
+
+def static_library_warnings(values: list[str]) -> list[str]:
+    """Warnings that should stay visible independent of active profile state."""
+    return [
+        _normalize_warning(str(value))
+        for value in values
+        if value and not is_ue4ss_runtime_dependency_warning(str(value))
+    ]
+
+
 def _path_to_str(path: Path | None) -> str:
     return str(path) if path else ""
 
@@ -150,7 +163,7 @@ class LibraryComponent:
             files=[LibraryComponentFile.from_scan_file(file) for file in component.files],
             warnings=[
                 _normalize_warning(value)
-                for value in list(component.warnings) + list(component.dependency_warnings)
+                for value in component.warnings
             ],
         )
 

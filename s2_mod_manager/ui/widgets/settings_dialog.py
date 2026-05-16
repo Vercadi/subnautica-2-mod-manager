@@ -134,7 +134,7 @@ class SettingsDialog(ctk.CTkToplevel):
         self._value(card, 7, "Steam", self.view.steam_status)
         self._value(card, 8, "Build", self.view.build_status)
         if self.view.gamepass_experimental:
-            self._value(card, 9, "Game Pass", "Experimental support. UE4SS base/runtime files target Content; standard Lua mods target WinGDK\\ue4ss\\Mods. Review Preview & Apply targets.")
+            self._value(card, 9, "Game Pass", "Experimental support. UE4SS base/runtime files target Content; standard Lua mods target WinGDK\\ue4ss\\Mods. Review Apply targets.")
             button_row = 10
         else:
             button_row = 9
