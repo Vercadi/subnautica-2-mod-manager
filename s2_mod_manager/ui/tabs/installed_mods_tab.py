@@ -10,6 +10,7 @@ from ...models.archive_info import (
     ScanResult,
 )
 from ...models.library_view import LibraryDisplayItem, LibraryViewState
+from ...models.mod_state import mod_display_state, selection_action_states
 from ..ui_tokens import UiTokens
 from ..window_utils import prompt_dialog
 from ..widgets.mod_inspector import ModInspector
@@ -96,6 +97,11 @@ class InstalledModsTab(ctk.CTkFrame):
         on_open_source=None,
         on_review_warnings=None,
         on_preview_deployment=None,
+        on_list_configs=None,
+        on_read_config=None,
+        on_save_config=None,
+        on_restore_config=None,
+        on_open_config_folder=None,
         ue4ss_policy: dict[str, bool] | None = None,
         on_toggle_ue4ss_policy=None,
         pending_change_count: int = 0,
@@ -134,6 +140,11 @@ class InstalledModsTab(ctk.CTkFrame):
         self.on_open_source = on_open_source
         self.on_review_warnings = on_review_warnings
         self.on_preview_deployment = on_preview_deployment
+        self.on_list_configs = on_list_configs
+        self.on_read_config = on_read_config
+        self.on_save_config = on_save_config
+        self.on_restore_config = on_restore_config
+        self.on_open_config_folder = on_open_config_folder
         self.ue4ss_policy = ue4ss_policy or {}
         self.on_toggle_ue4ss_policy = on_toggle_ue4ss_policy
         self.pending_change_count = pending_change_count
@@ -176,6 +187,11 @@ class InstalledModsTab(ctk.CTkFrame):
             ue4ss_policy=self.ue4ss_policy,
             on_toggle_ue4ss_policy=self.on_toggle_ue4ss_policy,
             on_preview_deployment=self.on_preview_deployment,
+            on_list_configs=self.on_list_configs,
+            on_read_config=self.on_read_config,
+            on_save_config=self.on_save_config,
+            on_restore_config=self.on_restore_config,
+            on_open_config_folder=self.on_open_config_folder,
         )
         self.inspector.grid(row=0, column=0, sticky="nsw", pady=0)
 
@@ -215,6 +231,7 @@ class InstalledModsTab(ctk.CTkFrame):
         if self.count_label is not None:
             self.count_label.configure(text=self._count_text())
         self._refresh_preview_button()
+        self._refresh_action_buttons()
         if previous_keys == next_keys and self._update_rows_in_place():
             self._restore_list_view(previous_view)
             return
@@ -225,6 +242,12 @@ class InstalledModsTab(ctk.CTkFrame):
         self.ue4ss_policy = dict(policy or {})
         if self.inspector is not None:
             self.inspector.set_ue4ss_policy(self.ue4ss_policy)
+
+    def set_action_message(self, message: str, *, warning: bool = False) -> None:
+        if self.preview_reason_label is None:
+            return
+        color = self.tokens.colors.warning if warning else self.tokens.colors.text_muted
+        self.preview_reason_label.configure(text=message, text_color=color)
 
     def set_profile_state(
         self,
@@ -247,6 +270,7 @@ class InstalledModsTab(ctk.CTkFrame):
         if self.profile_status_label is not None:
             self.profile_status_label.configure(text=self._profile_status_text())
         self._refresh_preview_button()
+        self._refresh_action_buttons()
 
     def enable_native_drop(self, callback=None) -> bool:
         self.native_drop_callback = callback or self._drop_sources_received
@@ -264,6 +288,7 @@ class InstalledModsTab(ctk.CTkFrame):
             empty = self._empty_state()
             empty.grid(row=0, column=0, sticky="ew", padx=3, pady=18)
             self.rows.append(empty)
+            self._refresh_action_buttons()
             return
         current_source = object()
         for index, mod in enumerate(self.mods):
@@ -294,6 +319,7 @@ class InstalledModsTab(ctk.CTkFrame):
             row.grid(row=len(self.rows), column=0, sticky="ew", padx=2, pady=5)
             self.rows.append(row)
             self.row_widgets[_mod_key(mod)] = row
+        self._refresh_action_buttons()
 
     def _update_rows_in_place(self) -> bool:
         for mod in self.mods:
@@ -311,15 +337,16 @@ class InstalledModsTab(ctk.CTkFrame):
                 return False
         return True
 
-    def _select(self, mod: PlaceholderMod) -> None:
+    def _select(self, mod: PlaceholderMod, *, inspector_tab: str | None = None) -> None:
         previous_key = _mod_key(self.selected)
         self.selected = mod
-        self.inspector.set_mod(mod)
+        self.inspector.set_mod(mod, active_tab=inspector_tab)
         current_key = _mod_key(mod)
         if previous_key in self.row_widgets:
             self.row_widgets[previous_key].set_selected(False)
         if current_key in self.row_widgets:
             self.row_widgets[current_key].set_selected(True)
+        self._refresh_action_buttons()
 
     def _source_header(self, mod: PlaceholderMod) -> ctk.CTkLabel:
         c = self.tokens.colors
@@ -443,10 +470,6 @@ class InstalledModsTab(ctk.CTkFrame):
     def _register_drop_target(self, widget) -> bool:
         if self.native_drop_callback is None:
             return False
-
-    def _open_mods_folder_clicked(self) -> None:
-        if self.on_open_mods_folder:
-            self.on_open_mods_folder()
         try:
             from tkinterdnd2 import DND_FILES
             widget.drop_target_register(DND_FILES)
@@ -460,6 +483,10 @@ class InstalledModsTab(ctk.CTkFrame):
             return True
         except Exception:
             return False
+
+    def _open_mods_folder_clicked(self) -> None:
+        if self.on_open_mods_folder:
+            self.on_open_mods_folder()
 
     def _build_profile_bar(self, parent) -> ctk.CTkFrame:
         t = self.tokens
@@ -550,6 +577,34 @@ class InstalledModsTab(ctk.CTkFrame):
                 state="normal" if enabled else "disabled",
             )
         if self.preview_reason_label is not None:
+            self.preview_reason_label.configure(text=reason)
+
+    def _refresh_action_buttons(self) -> None:
+        if not self.action_buttons:
+            return
+        selected = self._bulk_mods() or ([self.selected] if self.selected else [])
+        states = selection_action_states(
+            selected,
+            active_profile_protected=self.active_profile_protected,
+            pending_change_count=self.pending_change_count,
+            has_apply_callback=self.on_preview_deployment is not None,
+        )
+        c = self.tokens.colors
+        for name, action_state in states.items():
+            button = self.action_buttons.get(name)
+            if button is None:
+                continue
+            primary = name == "Apply"
+            enabled = action_state.enabled
+            button.configure(
+                state="normal" if enabled else "disabled",
+                fg_color=c.glass_cyan if primary and enabled else c.glass_black if enabled else c.disabled,
+                hover_color=c.panel_glass_hover if enabled else c.disabled,
+                border_color=c.shell_border if primary and enabled else c.border_cold if enabled else c.border_soft,
+                text_color=c.text_primary if enabled else c.text_muted,
+            )
+        if self.preview_reason_label is not None and not states.get("Apply").enabled:
+            reason = states.get("Apply").reason or ""
             self.preview_reason_label.configure(text=reason)
 
     def _scan_clicked(self) -> None:
@@ -649,6 +704,7 @@ class InstalledModsTab(ctk.CTkFrame):
             if mod.component_id and (mod.in_active_profile or mod.state in {"library", "candidate"})
         }
         self._render_rows()
+        self._refresh_action_buttons()
 
     def _enable_selected_clicked(self) -> None:
         targets = self._bulk_mods() or [self.selected]
@@ -666,12 +722,10 @@ class InstalledModsTab(ctk.CTkFrame):
     def _clear_selected_clicked(self) -> None:
         self.selected_bulk_ids.clear()
         self._render_rows()
+        self._refresh_action_buttons()
 
     def _remove_selected_clicked(self) -> None:
-        mods = self._bulk_mods()
-        if not mods:
-            self._remove_from_profile_clicked()
-            return
+        mods = self._bulk_mods() or [self.selected]
         component_ids = [mod.component_id for mod in mods if mod.in_active_profile and mod.component_id]
         if component_ids and self.on_remove_selected_profile_entries:
             self.on_remove_selected_profile_entries(component_ids)
@@ -697,6 +751,7 @@ class InstalledModsTab(ctk.CTkFrame):
             self.selected_bulk_ids.add(key)
         else:
             self.selected_bulk_ids.discard(key)
+        self._refresh_action_buttons()
 
     def _bulk_mods(self) -> list[PlaceholderMod]:
         if not self.selected_bulk_ids:
@@ -705,7 +760,7 @@ class InstalledModsTab(ctk.CTkFrame):
 
     def _review_warnings_clicked(self, mod: PlaceholderMod | None = None) -> None:
         target = mod or self.selected
-        self.selected = target
+        self._select(target, inspector_tab="Warnings")
         if self.on_review_warnings:
             self.on_review_warnings(target)
 
@@ -745,13 +800,20 @@ class InstalledModsTab(ctk.CTkFrame):
             command=lambda: self._open_source_clicked(mod),
             state="normal" if (mod.source_path or mod.managed_path) else "disabled",
         )
-        menu.add_command(label="Apply", command=self._preview_deployment_clicked)
+        _label, apply_enabled, _reason = self._preview_action_state()
+        menu.add_command(
+            label="Apply",
+            command=self._preview_deployment_clicked,
+            state="normal" if apply_enabled else "disabled",
+        )
         try:
             menu.tk_popup(x_root, y_root)
         finally:
             menu.grab_release()
 
     def _can_switch_mod(self, mod: PlaceholderMod) -> bool:
+        if mod.review_policy_text:
+            return bool(mod.in_active_profile and mod.profile_enabled and not self.active_profile_protected)
         if mod.in_active_profile:
             return not self.active_profile_protected
         return self._can_add_mod_to_profile(mod)
@@ -928,19 +990,9 @@ def preview_apply_action_state(
     if not has_preview_callback:
         return "Apply", False, "Apply unavailable."
     if pending_change_count <= 0:
-        return "Apply", False, "No pending changes."
+        return "Apply", False, "No pending changes. Enable a mod first."
     return "Apply", True, f"{pending_change_count} pending change(s). Click Apply to update the game."
 
 
 def _state_label(mod: PlaceholderMod) -> str:
-    if mod.review_policy_text:
-        return "Needs Review"
-    if mod.in_active_profile:
-        return "Enabled" if mod.profile_enabled else "Disabled"
-    if mod.installed:
-        return "Installed"
-    if mod.state == "library":
-        return "Available"
-    if mod.state.startswith("candidate"):
-        return "Available"
-    return mod.state.replace("_", " ").title()
+    return mod_display_state(mod)

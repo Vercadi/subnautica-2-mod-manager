@@ -87,7 +87,7 @@ def ui_tokens_for_size(size_name: str = "default") -> UiTokens:
             panel_gap=8,
             row_gap=5,
             nav_width=184,
-            inspector_width=350,
+            inspector_width=320,
             bottom_strip_height=130,
             top_bar_height=64,
         )
@@ -113,7 +113,7 @@ def ui_tokens_for_size(size_name: str = "default") -> UiTokens:
             panel_gap=14,
             row_gap=8,
             nav_width=240,
-            inspector_width=430,
+            inspector_width=400,
             bottom_strip_height=160,
             top_bar_height=80,
         )
@@ -138,7 +138,7 @@ def ui_tokens_for_size(size_name: str = "default") -> UiTokens:
         panel_gap=12,
         row_gap=6,
             nav_width=205,
-            inspector_width=388,
+            inspector_width=340,
         bottom_strip_height=145,
         top_bar_height=72,
     )

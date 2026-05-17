@@ -62,6 +62,17 @@ class ScanEntry:
     def is_companion(self) -> bool:
         return self.suffix in {".ucas", ".utoc"}
 
+    def to_dict(self) -> dict:
+        return {"path": self.path, "is_dir": self.is_dir, "size": self.size}
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "ScanEntry":
+        return cls(
+            path=str(data.get("path") or ""),
+            is_dir=bool(data.get("is_dir", False)),
+            size=int(data.get("size") or 0),
+        )
+
 
 @dataclass(frozen=True)
 class ComponentFile:
@@ -69,6 +80,23 @@ class ComponentFile:
     role: str = "file"
     target_hint: str = ""
     size: int = 0
+
+    def to_dict(self) -> dict:
+        return {
+            "source_path": self.source_path,
+            "role": self.role,
+            "target_hint": self.target_hint,
+            "size": self.size,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "ComponentFile":
+        return cls(
+            source_path=str(data.get("source_path") or ""),
+            role=str(data.get("role") or "file"),
+            target_hint=str(data.get("target_hint") or ""),
+            size=int(data.get("size") or 0),
+        )
 
 
 @dataclass
@@ -87,6 +115,35 @@ class ScannedComponent:
     @property
     def file_count(self) -> int:
         return len(self.files)
+
+    def to_dict(self) -> dict:
+        return {
+            "component_id": self.component_id,
+            "display_name": self.display_name,
+            "component_type": self.component_type,
+            "install_kind": self.install_kind,
+            "files": [file.to_dict() for file in self.files],
+            "badges": list(self.badges),
+            "target_hint": self.target_hint,
+            "dependency_warnings": list(self.dependency_warnings),
+            "warnings": list(self.warnings),
+            "selected_variant": self.selected_variant,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "ScannedComponent":
+        return cls(
+            component_id=str(data.get("component_id") or ""),
+            display_name=str(data.get("display_name") or ""),
+            component_type=str(data.get("component_type") or ""),
+            install_kind=str(data.get("install_kind") or ""),
+            files=[ComponentFile.from_dict(item) for item in data.get("files", []) if isinstance(item, dict)],
+            badges=[str(value) for value in data.get("badges", []) if value],
+            target_hint=str(data.get("target_hint") or ""),
+            dependency_warnings=[str(value) for value in data.get("dependency_warnings", []) if value],
+            warnings=[str(value) for value in data.get("warnings", []) if value],
+            selected_variant=str(data.get("selected_variant") or ""),
+        )
 
 
 @dataclass
@@ -111,3 +168,36 @@ class ScanResult:
     @property
     def component_count(self) -> int:
         return len(self.components)
+
+    def to_dict(self) -> dict:
+        return {
+            "source_path": self.source_path,
+            "source_kind": self.source_kind,
+            "display_name": self.display_name,
+            "source_hash": self.source_hash,
+            "source_paths": list(self.source_paths),
+            "components": [component.to_dict() for component in self.components],
+            "entries": [entry.to_dict() for entry in self.entries],
+            "unsupported_files": list(self.unsupported_files),
+            "unsafe_entries": list(self.unsafe_entries),
+            "warnings": list(self.warnings),
+            "errors": list(self.errors),
+            "ambiguous": self.ambiguous,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "ScanResult":
+        return cls(
+            source_path=str(data.get("source_path") or ""),
+            source_kind=str(data.get("source_kind") or ""),
+            display_name=str(data.get("display_name") or ""),
+            source_hash=str(data.get("source_hash") or ""),
+            source_paths=[str(value) for value in data.get("source_paths", []) if value],
+            components=[ScannedComponent.from_dict(item) for item in data.get("components", []) if isinstance(item, dict)],
+            entries=[ScanEntry.from_dict(item) for item in data.get("entries", []) if isinstance(item, dict)],
+            unsupported_files=[str(value) for value in data.get("unsupported_files", []) if value],
+            unsafe_entries=[str(value) for value in data.get("unsafe_entries", []) if value],
+            warnings=[str(value) for value in data.get("warnings", []) if value],
+            errors=[str(value) for value in data.get("errors", []) if value],
+            ambiguous=bool(data.get("ambiguous", False)),
+        )

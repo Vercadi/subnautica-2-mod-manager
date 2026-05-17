@@ -19,13 +19,14 @@ except Exception:  # pragma: no cover - depends on optional native runtime
 from .. import __app_name__, __version__
 from ..core.app_dirs import AppDirs, resolve_app_dirs
 from ..core.apply_workflow import apply_result_text, build_apply_preview
-from ..core.archive_inspector import scan_inbox
 from ..core.activity_log import ActivityLog
 from ..core.backup_store import BackupStore
+from ..core.config_service import ConfigService
 from ..core.diagnostics import collect_diagnostics
 from ..core.discovery import discover_all
 from ..core.first_run import prepare_first_run_state
 from ..core.folder_targets import game_mods_folder_target
+from ..core.gamepass_health import GamePassHealth, build_gamepass_health
 from ..core.help_about import build_help_about_view
 from ..core.library_store import LibraryStore
 from ..core.library_workflow import (
@@ -35,9 +36,11 @@ from ..core.library_workflow import (
 )
 from ..core.import_review import (
     build_import_review,
+    can_quick_install_review,
     import_review_selection as import_selected_review_sources,
     import_review_summary,
     parse_drop_paths,
+    quick_install_selection,
 )
 from ..core.installer import Installer
 from ..core.logging_service import setup_logging
@@ -74,12 +77,16 @@ from ..core.settings_workflow import (
     update_ue4ss_activation_preference,
 )
 from ..core.settings_store import load_preferences, load_settings, save_settings
+from ..core.scan_cache import ScanCache
 from ..core.sync_planner import build_sync_deployment_plan
+from ..core.timing import timed_operation
 from ..core.update_checker import ReleaseInfo, UpdateCheckResult, check_for_update
 from ..models.app_state import AppRuntimeState
+from ..models.config_file import ConfigFileInfo
 from ..models.deployment import DeploymentPlan
 from ..models.diagnostics import DiagnosticsReport
 from ..models.import_review import ImportReview, ImportSelection
+from ..models.mod_state import mod_display_state
 from ..models.needs_attention import NeedsAttentionSummary
 from ..models.profile import VANILLA_PROFILE_ID
 from ..models.preferences import UserPreferences
@@ -117,15 +124,18 @@ class AppWindow(ctk.CTk):
         self.app_state = self._load_app_state()
         self.preferences = load_preferences(self.settings_path)
         self.activity = ActivityLog(self.dirs.data_dir)
+        self.scan_cache = ScanCache(self.dirs.data_dir)
         self.library_store = LibraryStore(self.dirs.data_dir)
         self.manifest_store = ManifestStore(self.dirs.data_dir)
         self.recovery_service = RecoveryService(self.manifest_store)
+        self.config_service = ConfigService(self.manifest_store, BackupStore(self.dirs.backup_dir))
         self.recovery_summary: RecoverySummary = self.recovery_service.summary()
         self.restore_preview: RestoreVanillaPreview = self.recovery_service.restore_vanilla_preview(self.app_state.paths)
+        self.gamepass_health: GamePassHealth = build_gamepass_health(self.app_state.paths)
         self.diagnostics_report: DiagnosticsReport | None = None
         self.update_check_result: UpdateCheckResult | None = None
         self.needs_attention: NeedsAttentionSummary = NeedsAttentionSummary()
-        self.inbox_scans = scan_inbox(self.app_state.paths.archive_inbox_dir)
+        self.inbox_scans = self._scan_inbox_cached()
         self.hidden_inbox_hashes: set[str] = set()
         self.library_view = build_library_view_state(self.library_store, self._visible_inbox_scans())
         self.profile_store = ProfileStore(self.dirs.data_dir)
@@ -257,6 +267,11 @@ class AppWindow(ctk.CTk):
             on_open_source=self.open_mod_source,
             on_review_warnings=self.open_warning_details,
             on_preview_deployment=self.preview_deployment,
+            on_list_configs=self.list_mod_configs,
+            on_read_config=self.read_mod_config,
+            on_save_config=self.save_mod_config,
+            on_restore_config=self.restore_mod_config,
+            on_open_config_folder=self.open_config_folder,
             ue4ss_policy=self.preferences.ue4ss_activation_policy(),
             on_toggle_ue4ss_policy=self.toggle_ue4ss_activation_policy,
             pending_change_count=self._pending_change_count(),
@@ -330,8 +345,12 @@ class AppWindow(ctk.CTk):
             f"{summary.imported_source_count} already imported, {summary.candidate_source_count} candidate."
         )
 
+    def _scan_inbox_cached(self):
+        with timed_operation("scan inbox"):
+            return self.scan_cache.scan_inbox(self.app_state.paths.archive_inbox_dir)
+
     def scan_mods_inbox(self) -> None:
-        self.inbox_scans = scan_inbox(self.app_state.paths.archive_inbox_dir)
+        self.inbox_scans = self._scan_inbox_cached()
         self._refresh_library_view(refresh_diagnostics=True)
         self._console_write(self._inbox_summary())
         self._record_activity("scan inbox", "completed", target=str(self.app_state.paths.archive_inbox_dir or ""), details=self.library_view.summary.text)
@@ -399,9 +418,14 @@ class AppWindow(ctk.CTk):
 
     def open_import_review(self, paths) -> None:
         imported_hashes = {source.source_hash for source in self.library_store.list_sources() if source.source_hash}
-        review = build_import_review(paths, imported_hashes=imported_hashes)
+        with timed_operation("build import review"):
+            review = build_import_review(paths, imported_hashes=imported_hashes)
         self._console_write(import_review_summary(review))
         self._record_activity("import review", "opened", details=review.summary_text)
+        if can_quick_install_review(review):
+            self._console_write("Safe supported source detected: installing and enabling without extra review.")
+            self.import_review_selection(review, quick_install_selection(review), enable=True)
+            return
         ImportReviewDialog(
             self,
             tokens=self.tokens,
@@ -427,7 +451,7 @@ class AppWindow(ctk.CTk):
                 self.library_store.list_components(),
                 selected_component_ids=selected_component_ids,
             )
-        self.inbox_scans = scan_inbox(self.app_state.paths.archive_inbox_dir)
+        self.inbox_scans = self._scan_inbox_cached()
         self._refresh_library_view(refresh_diagnostics=True)
         self._console_write(import_review_summary(review, imported_count=len(imported)))
         if enable_result is not None:
@@ -906,6 +930,8 @@ class AppWindow(ctk.CTk):
             message = preview.disabled_reason or "No installable changes."
             self._console_write(f"Apply skipped: {message}")
             self._record_activity("apply", "skipped", details=message)
+            if self.installed_tab is not None:
+                self.installed_tab.set_action_message(message, warning=True)
             return
         if preview.blocked:
             self._console_write(
@@ -1029,7 +1055,7 @@ class AppWindow(ctk.CTk):
         message = "\n".join(
             [
                 "Needs Attention",
-                self.needs_attention.detail_text(),
+                _compact_needs_attention_text(self.needs_attention),
                 "",
                 "Diagnostics / Support Report",
                 report,
@@ -1063,7 +1089,7 @@ class AppWindow(ctk.CTk):
             warnings.append(mod.review_policy_text)
         lines = [
             mod.name,
-            f"State: {'Enabled' if mod.in_active_profile and mod.profile_enabled else 'Disabled' if mod.in_active_profile else 'Installed' if mod.installed else 'Available' if mod.state == 'library' or mod.state.startswith('candidate') else mod.state.replace('_', ' ').title()}",
+            f"State: {mod_display_state(mod)}",
             f"Profile: {'Enabled in active profile' if mod.in_active_profile and mod.profile_enabled else 'Disabled in active profile' if mod.in_active_profile else 'Not in Profile'}",
             "",
             "Warnings:",
@@ -1083,7 +1109,7 @@ class AppWindow(ctk.CTk):
             ]
         )
         self._record_activity("warning details", "opened", target=mod.name)
-        report_dialog(self, tokens=self.tokens, title=f"Warnings: {mod.name}", message="\n".join(lines), width=780, height=560)
+        self._console_write(f"Warnings for {mod.name}: " + ("; ".join(dict.fromkeys(warnings)) if warnings else "none"))
 
     def open_mod_source(self, mod: PlaceholderMod) -> None:
         path_text = mod.managed_path or mod.source_path
@@ -1091,6 +1117,31 @@ class AppWindow(ctk.CTk):
         ok, message = open_path_in_shell(path)
         self._console_write(message)
         self._record_activity("open source", "opened" if ok else "refused", target=mod.name, details=message)
+
+    def list_mod_configs(self, mod: PlaceholderMod) -> list[ConfigFileInfo]:
+        if not mod.installed or not mod.component_id:
+            return []
+        return self.config_service.list_component_configs(mod.component_id)
+
+    def read_mod_config(self, info: ConfigFileInfo) -> tuple[bool, str]:
+        return self.config_service.read_config(info)
+
+    def save_mod_config(self, mod: PlaceholderMod, info: ConfigFileInfo, text: str):
+        result = self.config_service.save_config(info, text)
+        self._console_write(result.message)
+        self._record_activity("config edit", "saved" if result.ok else "refused", target=mod.name, details=result.message)
+        self._refresh_recovery_state()
+        return result
+
+    def restore_mod_config(self, mod: PlaceholderMod, info: ConfigFileInfo):
+        result = self.config_service.restore_original(info)
+        self._console_write(result.message)
+        self._record_activity("config restore", "restored" if result.ok else "refused", target=mod.name, details=result.message)
+        self._refresh_recovery_state()
+        return result
+
+    def open_config_folder(self, info: ConfigFileInfo) -> None:
+        self.open_folder(info.installed_path.parent)
 
     def _show_message(self, kind: str, title: str, message: str, *, force: bool = False) -> None:
         if force or self.preferences.popup_enabled(kind):
@@ -1157,7 +1208,8 @@ class AppWindow(ctk.CTk):
         if apply_paths:
             self.app_state.paths = result.paths
             self.app_state.discovery_messages = result.discovery_messages
-            self.inbox_scans = scan_inbox(self.app_state.paths.archive_inbox_dir)
+            self.gamepass_health = build_gamepass_health(self.app_state.paths)
+            self.inbox_scans = self._scan_inbox_cached()
             self._refresh_library_view(refresh_recovery=True, refresh_diagnostics=True)
             if self.command_bar is not None:
                 self.command_bar.set_status(
@@ -1213,6 +1265,7 @@ class AppWindow(ctk.CTk):
     def _refresh_recovery_state(self) -> None:
         self.manifest_store = ManifestStore(self.dirs.data_dir)
         self.recovery_service = RecoveryService(self.manifest_store)
+        self.config_service = ConfigService(self.manifest_store, BackupStore(self.dirs.backup_dir))
         self.recovery_summary = self.recovery_service.summary()
         self.restore_preview = self.recovery_service.restore_vanilla_preview(self.app_state.paths)
 
@@ -1308,6 +1361,8 @@ class AppWindow(ctk.CTk):
         self._console_write(text)
         self._console_write(self.recovery_summary.text)
         self._record_activity("apply", "completed" if result.ok else "failed", details=text)
+        if self.installed_tab is not None:
+            self.installed_tab.set_action_message(text, warning=not result.ok)
         return text
 
     def _deployment_status_map(self) -> dict[str, str]:
@@ -1393,3 +1448,22 @@ def _summarize_actions(actions: list[str]) -> str:
     display = {"create": "install", "delete": "remove"}
     counts = {action: actions.count(action) for action in sorted(set(actions))}
     return ", ".join(f"{count} {display.get(name, name)}" for name, count in counts.items())
+
+
+def _compact_needs_attention_text(summary, *, limit: int = 8) -> str:
+    if not getattr(summary, "items", None):
+        return summary.summary_text
+    lines = [summary.summary_text]
+    for item in summary.items[:limit]:
+        lines.append(f"- {item.title}: {_compact_line(item.detail, 130)}")
+    remaining = len(summary.items) - limit
+    if remaining > 0:
+        lines.append(f"- ... {remaining} more")
+    return "\n".join(lines)
+
+
+def _compact_line(value: str, max_chars: int) -> str:
+    text = " ".join(str(value or "").replace("\r", " ").replace("\n", " ").split())
+    if len(text) <= max_chars:
+        return text
+    return text[: max_chars - 3].rstrip() + "..."

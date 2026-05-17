@@ -1,5 +1,34 @@
 # Changelog
 
+## 0.1.4
+
+UX clarity, installed-config editing, and responsiveness hardening.
+
+Changed:
+
+- Added unified mod states so rows and inspector text use clearer labels like Available, Enabled, Pending Apply, Installed, Will Remove, Needs Review, and Blocked.
+- Main row selection actions now expose clearer enable/disable/remove/uninstall availability and disabled reasons.
+- Safe unambiguous drag/drop or Install From File sources can now install into the manager and enable automatically without forcing Import Review.
+- Review-required loose overlays stay skipped while supported safe profile changes can still apply.
+- Normal warning details now route to inline/console context instead of opening noisy noncritical popups.
+- Native drag/drop registration was fixed for the full mod list area.
+- Inbox scans use a persistent cache and timing logs to reduce repeated scan cost.
+
+Added:
+
+- Installed-mod-only config discovery and editing for safe text config files: `.lua`, `.ini`, `.json`, `.txt`, and `.cfg`.
+- Config edits back up the installed file before saving and can restore the imported original.
+- Game Pass / WinGDK UE4SS health output for runtime root, mod target, proxy DLLs, and experimental layout warnings.
+- Runtime warning suppression is stricter when UE4SS is installed, manually present, or enabled in the active profile.
+
+Safety:
+
+- Config editing is only available for manager-installed files.
+- Imported-but-not-installed mods show install-first guidance instead of an editor.
+- Unknown/manual files are still never deleted.
+- Loose overlays and SN2P-style root overlays remain review-required.
+- Critical uninstall/reset confirmations remain non-disableable.
+
 ## 0.1.3
 
 UX simplification and profile/game sync redesign.

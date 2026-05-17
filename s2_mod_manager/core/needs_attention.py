@@ -7,6 +7,7 @@ from ..models.library import LibraryComponent, LibrarySource, static_library_war
 from ..models.needs_attention import AttentionItem, NeedsAttentionSummary
 from ..models.recovery import RecoverySummary
 from .archive_handler import archive_support_status
+from .gamepass_health import build_gamepass_health
 from .profile_workflow import LoadoutWarning
 from .review_policy import review_policy_for_component
 from .update_checker import UpdateCheckResult
@@ -28,13 +29,16 @@ def build_needs_attention(
     if not paths.client_root or not paths.has_valid_layout:
         items.append(AttentionItem("S2 install", "Subnautica 2 install is missing or invalid.", "error"))
     elif paths.is_gamepass_experimental:
+        health = build_gamepass_health(paths)
         items.append(
             AttentionItem(
                 "Game Pass layout",
-                "Game Pass support is experimental. UE4SS mods target WinGDK\\ue4ss\\Mods; preview targets carefully and report crashes with a support report.",
+                health.summary_text + ". Preview targets carefully and report crashes with a support report.",
                 "warning",
             )
         )
+        for warning in health.warnings[:2]:
+            items.append(AttentionItem("Game Pass / UE4SS", warning, "warning"))
 
     for suffix, supported in sorted(archive_support_status().items()):
         if not supported and suffix in {".7z", ".rar"}:

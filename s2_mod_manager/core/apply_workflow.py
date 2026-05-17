@@ -65,7 +65,7 @@ def _disabled_reason(plan: DeploymentPlan, *, fake: bool, allow_apply: bool) -> 
         return "Plan has errors that must be fixed before install: " + "; ".join(blocking_errors[:3])
     if plan.blocked_actions:
         return (
-            "Only review-required items are selected. manual review is needed for blocked loose overlays; "
+            "Only review-required items are selected. Manual review is needed for blocked loose overlays; "
             "select at least one supported mod, or remove the blocked item."
         )
     if plan.dry_run and fake:
@@ -75,7 +75,7 @@ def _disabled_reason(plan: DeploymentPlan, *, fake: bool, allow_apply: bool) -> 
     if not plan.real_apply_enabled:
         return "Apply is disabled for this plan."
     if not (plan.creates or plan.overwrites or plan.deletes):
-        return "No profile changes need to be applied."
+        return "No pending game changes. Enable a mod or use Install & Enable, then click Apply."
     return "Apply is not available for this plan."
 
 

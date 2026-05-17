@@ -6,6 +6,7 @@ import customtkinter as ctk
 
 from ..ui_tokens import UiTokens
 from .mod_row import PlaceholderMod, _fit_text
+from ...models.mod_state import mod_display_state
 
 
 class ModInspector(ctk.CTkFrame):
@@ -18,6 +19,11 @@ class ModInspector(ctk.CTkFrame):
         ue4ss_policy: dict[str, bool] | None = None,
         on_toggle_ue4ss_policy=None,
         on_preview_deployment=None,
+        on_list_configs=None,
+        on_read_config=None,
+        on_save_config=None,
+        on_restore_config=None,
+        on_open_config_folder=None,
     ):
         colors = tokens.colors
         super().__init__(
@@ -33,19 +39,34 @@ class ModInspector(ctk.CTkFrame):
         self.ue4ss_policy = dict(ue4ss_policy or {})
         self.on_toggle_ue4ss_policy = on_toggle_ue4ss_policy
         self.on_preview_deployment = on_preview_deployment
+        self.on_list_configs = on_list_configs
+        self.on_read_config = on_read_config
+        self.on_save_config = on_save_config
+        self.on_restore_config = on_restore_config
+        self.on_open_config_folder = on_open_config_folder
         self.title_label: ctk.CTkLabel | None = None
         self.subtitle_label: ctk.CTkLabel | None = None
         self.metadata_labels: dict[str, ctk.CTkLabel] = {}
+        self.tabs: ctk.CTkTabview | None = None
+        self.config_status_label: ctk.CTkLabel | None = None
+        self.config_textbox: ctk.CTkTextbox | None = None
+        self.config_files: list = []
+        self.selected_config = None
         self.grid_propagate(False)
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(2, weight=1)
         self._build()
 
-    def set_mod(self, mod: PlaceholderMod) -> None:
+    def set_mod(self, mod: PlaceholderMod, *, active_tab: str | None = None) -> None:
         self.mod = mod
         for child in self.winfo_children():
             child.destroy()
         self._build()
+        if active_tab and self.tabs is not None:
+            try:
+                self.tabs.set(active_tab)
+            except ValueError:
+                pass
 
     def update_mod_summary(self, mod: PlaceholderMod) -> None:
         self.mod = mod
@@ -95,11 +116,14 @@ class ModInspector(ctk.CTkFrame):
             text_color=c.text_primary,
         )
         tabs.grid(row=2, column=0, sticky="nsew", padx=14, pady=(0, 10))
-        for name in ("Info", "Files", "UE4SS"):
+        self.tabs = tabs
+        for name in ("Info", "Files", "Config", "Warnings", "UE4SS"):
             tabs.add(name)
 
         self._overview(tabs.tab("Info"))
         self._files(tabs.tab("Files"))
+        self._config(tabs.tab("Config"))
+        self._warnings(tabs.tab("Warnings"))
         self._ue4ss(tabs.tab("UE4SS"))
 
         actions = ctk.CTkFrame(self, fg_color="transparent")
@@ -152,6 +176,89 @@ class ModInspector(ctk.CTkFrame):
             parent,
             _files_text(self.mod),
         )
+
+    def _warnings(self, parent) -> None:
+        self._text_tab(parent, _warnings_text(self.mod))
+
+    def _config(self, parent) -> None:
+        t = self.tokens
+        c = t.colors
+        if not self.mod.installed:
+            ctk.CTkLabel(
+                parent,
+                text="Install this mod before editing config.",
+                text_color=c.text_secondary,
+                font=(t.font_family, t.small, "bold"),
+                wraplength=max(260, t.inspector_width - 72),
+                justify="left",
+            ).pack(anchor="w", padx=12, pady=12)
+            return
+        self.config_files = self.on_list_configs(self.mod) if self.on_list_configs else []
+        if not self.config_files:
+            ctk.CTkLabel(
+                parent,
+                text="No editable config files found for this installed mod.",
+                text_color=c.text_secondary,
+                font=(t.font_family, t.small, "bold"),
+                wraplength=max(260, t.inspector_width - 72),
+                justify="left",
+            ).pack(anchor="w", padx=12, pady=12)
+            return
+        names = [item.display_name for item in self.config_files]
+        self.selected_config = self.config_files[0]
+        menu = ctk.CTkOptionMenu(
+            parent,
+            values=names,
+            fg_color=c.glass_black,
+            button_color=c.glass_cyan,
+            button_hover_color=c.panel_glass_hover,
+            text_color=c.text_primary,
+            command=self._config_selected,
+        )
+        menu.pack(fill="x", padx=10, pady=(10, 6))
+        self.config_textbox = ctk.CTkTextbox(
+            parent,
+            fg_color="#04131E",
+            text_color=c.text_secondary,
+            border_width=1,
+            border_color=c.border_soft,
+            font=(t.mono_family, t.mono),
+            wrap="none",
+            height=115,
+        )
+        self.config_textbox.pack(fill="both", expand=True, padx=10, pady=(0, 6))
+        actions = ctk.CTkFrame(parent, fg_color="transparent")
+        actions.pack(fill="x", padx=10, pady=(0, 6))
+        for index, (label, command) in enumerate(
+            (
+                ("Save", self._save_config),
+                ("Restore Original", self._restore_config),
+                ("Open Folder", self._open_config_folder),
+            )
+        ):
+            ctk.CTkButton(
+                actions,
+                text=label,
+                height=26,
+                fg_color=c.glass_black,
+                hover_color=c.panel_glass,
+                border_width=1,
+                border_color=c.border_cold,
+                text_color=c.text_secondary,
+                font=(t.font_family, t.tiny, "bold"),
+                command=command,
+            ).grid(row=0, column=index, sticky="ew", padx=(0, 4))
+            actions.grid_columnconfigure(index, weight=1)
+        self.config_status_label = ctk.CTkLabel(
+            parent,
+            text="",
+            text_color=c.text_muted,
+            font=(t.font_family, t.tiny),
+            wraplength=max(260, t.inspector_width - 72),
+            justify="left",
+        )
+        self.config_status_label.pack(fill="x", padx=10, pady=(0, 8))
+        self._load_selected_config()
 
     def _ue4ss(self, parent) -> None:
         t = self.tokens
@@ -225,6 +332,43 @@ class ModInspector(ctk.CTkFrame):
         if isinstance(updated, dict):
             self.ue4ss_policy = dict(updated)
 
+    def _config_selected(self, name: str) -> None:
+        self.selected_config = next((item for item in self.config_files if item.display_name == name), None)
+        self._load_selected_config()
+
+    def _load_selected_config(self) -> None:
+        if self.config_textbox is None or self.selected_config is None:
+            return
+        ok, text = self.on_read_config(self.selected_config) if self.on_read_config else (False, "Config reader unavailable.")
+        self.config_textbox.configure(state="normal")
+        self.config_textbox.delete("1.0", "end")
+        self.config_textbox.insert("1.0", text)
+        if not ok or not self.selected_config.editable:
+            self.config_textbox.configure(state="disabled")
+        if self.config_status_label is not None:
+            reason = self.selected_config.reason if not self.selected_config.editable else ""
+            self.config_status_label.configure(text=reason or ("Ready to edit installed config." if ok else text))
+
+    def _save_config(self) -> None:
+        if self.selected_config is None or self.config_textbox is None or not self.on_save_config:
+            return
+        text = self.config_textbox.get("1.0", "end-1c")
+        result = self.on_save_config(self.mod, self.selected_config, text)
+        if self.config_status_label is not None:
+            self.config_status_label.configure(text=getattr(result, "message", str(result)))
+
+    def _restore_config(self) -> None:
+        if self.selected_config is None or not self.on_restore_config:
+            return
+        result = self.on_restore_config(self.mod, self.selected_config)
+        if self.config_status_label is not None:
+            self.config_status_label.configure(text=getattr(result, "message", str(result)))
+        self._load_selected_config()
+
+    def _open_config_folder(self) -> None:
+        if self.selected_config is not None and self.on_open_config_folder:
+            self.on_open_config_folder(self.selected_config)
+
     def _preview_apply(self) -> None:
         if self.on_preview_deployment:
             self.on_preview_deployment()
@@ -278,7 +422,7 @@ def _ue4ss_text(mod: PlaceholderMod) -> str:
         "Notes:",
         "- These toggles persist manager policy only.",
         "- Apply writes managed activation files only when the plan is not blocked.",
-        "- Mod config/settings editing should be added per-file once deployed/imported config shapes are known.",
+        "- Config editing is available from the Config tab after a mod is installed.",
         "- Root scripts/ folders still require review before layout rewrite.",
         "",
         "Warnings:",
@@ -294,6 +438,38 @@ def _ue4ss_text(mod: PlaceholderMod) -> str:
         lines.extend(f"- {warning}" for warning in dict.fromkeys(warnings))
     else:
         lines.append("- none")
+    return "\n".join(lines)
+
+
+def _warnings_text(mod: PlaceholderMod) -> str:
+    lines = [
+        f"{mod.name}",
+        f"State: {_state_label(mod)}",
+        f"Profile: {_profile_status(mod)}",
+        "",
+        "Warnings:",
+    ]
+    warnings = list(mod.dependency_warnings) + list(mod.source_warnings)
+    if mod.review_policy_text:
+        warnings.insert(0, mod.review_policy_text)
+    if mod.profile_warning:
+        warnings.insert(0, mod.profile_warning)
+    if mod.warning:
+        warnings.insert(0, mod.warning)
+    if warnings:
+        lines.extend(f"- {warning}" for warning in dict.fromkeys(warnings))
+    else:
+        lines.append("- none")
+    lines.extend(
+        [
+            "",
+            "Next actions:",
+            "- Use Enable for selected safe mods.",
+            "- Use Apply to sync enabled/disabled profile changes to the game.",
+            "- Use Uninstall for manager-installed files you want removed now.",
+            "- Review-required loose overlays stay skipped until a safe recipe exists.",
+        ]
+    )
     return "\n".join(lines)
 
 
@@ -343,14 +519,4 @@ def _metadata_row(parent, tokens: UiTokens, label: str, value: str) -> ctk.CTkLa
 
 
 def _state_label(mod: PlaceholderMod) -> str:
-    if mod.review_policy_text:
-        return "Needs Review"
-    if mod.in_active_profile:
-        return "Enabled" if mod.profile_enabled else "Disabled"
-    if mod.installed:
-        return "Installed"
-    if mod.state == "library":
-        return "Available"
-    if mod.state.startswith("candidate"):
-        return "Available"
-    return mod.state.replace("_", " ").title()
+    return mod_display_state(mod)

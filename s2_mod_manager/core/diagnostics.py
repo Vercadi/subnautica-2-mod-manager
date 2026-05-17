@@ -9,6 +9,7 @@ from ..models.deployment import DeploymentPlan
 from ..models.diagnostics import DiagnosticsReport
 from ..models.recovery import RecoverySummary
 from .archive_handler import archive_support_status
+from .gamepass_health import build_gamepass_health
 from .library_store import LibraryStore
 from .manifest_store import ManifestStore
 from .profile_store import ProfileStore
@@ -30,6 +31,8 @@ def collect_diagnostics(
     active = profile_store.active_profile()
     manifest_installs = manifest_store.list_installs()
     backup_count = sum(len(record.backups) for record in manifest_installs)
+    health = build_gamepass_health(paths)
+    health_summary = _redact_text(health.summary_text, home=home)
     return DiagnosticsReport(
         app_version=__version__,
         install_detected=paths.client_root is not None,
@@ -57,7 +60,7 @@ def collect_diagnostics(
         recovery_summary=recovery_summary.text,
         manifest_install_count=len(manifest_installs),
         backup_count=backup_count,
-        ue4ss_runtime_state=_ue4ss_runtime_state(paths),
+        ue4ss_runtime_state=f"{_ue4ss_runtime_state(paths)}; {health_summary}",
         app_data_dir=redact_path(data_dir, home=home),
         log_excerpt=read_log_excerpt(log_path, line_limit=25, home=home),
     )

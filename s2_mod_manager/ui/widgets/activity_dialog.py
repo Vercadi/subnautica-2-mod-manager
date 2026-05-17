@@ -5,6 +5,7 @@ import customtkinter as ctk
 from ...models.activity import ActivityRecord
 from ..ui_tokens import UiTokens
 from ..window_utils import configure_dialog
+from .mod_row import _fit_text
 
 
 class ActivityDialog(ctk.CTkToplevel):
@@ -60,11 +61,12 @@ class ActivityDialog(ctk.CTkToplevel):
             ctk.CTkLabel(body, text=record.created_at.replace("+00:00", "Z"), text_color=c.text_muted, font=(t.mono_family, t.tiny)).grid(row=index, column=0, sticky="nw", padx=12, pady=4)
             ctk.CTkLabel(
                 body,
-                text=record.summary_text,
+                text=activity_brief(record),
                 text_color=c.text_secondary,
                 font=(t.font_family, t.small),
                 wraplength=590,
                 justify="left",
+                anchor="w",
             ).grid(row=index, column=1, sticky="ew", padx=(0, 12), pady=4)
 
         footer = ctk.CTkFrame(self, fg_color="transparent")
@@ -82,3 +84,17 @@ class ActivityDialog(ctk.CTkToplevel):
             text_color=c.text_secondary,
             command=self.destroy,
         ).grid(row=0, column=1, sticky="e")
+
+
+def activity_brief(record: ActivityRecord) -> str:
+    bits = [record.action, record.result]
+    if record.target:
+        bits.append(_compact_value(record.target, 52))
+    if record.details:
+        bits.append(_compact_value(record.details, 96))
+    return " | ".join(bit for bit in bits if bit)
+
+
+def _compact_value(value: str, max_chars: int) -> str:
+    text = str(value or "").replace("\r", " ").replace("\n", " ")
+    return _fit_text(" ".join(text.split()), max_chars)

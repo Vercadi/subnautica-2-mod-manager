@@ -130,11 +130,9 @@ class SettingsView:
     @property
     def summary_text(self) -> str:
         return (
-            f"Settings: install={'valid' if self.install_valid else 'invalid'}, "
-            f"variant={self.install_variant}, "
-            f"inbox={self.inbox_path or 'not set'}, "
-            f"archives=({self.archive_support_text}), startup_updates={'on' if self.auto_check_updates else 'off'}, "
-            f"popups=({self.popup_text}), ue4ss=({self.ue4ss_policy_text})"
+            f"Settings: {'valid install' if self.install_valid else 'invalid install'} | "
+            f"{self.install_variant} | updates {'on' if self.auto_check_updates else 'off'} | "
+            f"popups: {self.popup_policy_label} | UE4SS enabled.txt {'on' if self.ue4ss_write_enabled_txt else 'off'}"
         )
 
 

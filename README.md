@@ -10,6 +10,7 @@ The app imports mods into a manager-owned library, lets users build profiles, pr
 - Manual install path selection and validation for Steam/Epic-style Win64 layouts
 - Experimental Game Pass WinGDK layout support
 - Drag/drop and browse import for files, folders, `.zip`, `.7z`, and supported archive layouts
+- One-step Install & Enable for safe unambiguous mods
 - Pak bundle detection for `.pak`, `.ucas`, and `.utoc`
 - UE4SS LogicMods pak target support for non-`_P` Blueprint/logic pak bundles
 - UE4SS runtime detection
@@ -19,6 +20,8 @@ The app imports mods into a manager-owned library, lets users build profiles, pr
 - Enable/disable controls and bulk profile actions
 - UE4SS activation file support for `enabled.txt`, `mods.txt`, and `mods.json`
 - Primary Apply flow with exact installs, removals, overwrites, skips, warnings, errors, and blocked actions
+- Installed-mod config editing for safe text configs such as `.lua`, `.ini`, `.json`, `.txt`, and `.cfg`
+- Game Pass / UE4SS health output for runtime and target-folder troubleshooting
 - Manifest-backed managed install, uninstall, backup, and recovery
 - Diagnostics, redacted support report generation, and activity logging
 - Portable PyInstaller build with Subnautica-inspired UI
@@ -66,6 +69,8 @@ Pak target policy:
 - Archives that already include `Content\Paks\LogicMods` or `Content\Paks\~mods` keep that target folder.
 
 Every managed apply is recorded in `install_manifest.json`. If an existing managed target is overwritten, the original file is backed up first. Apply also removes manager-installed files that no longer belong to the active profile. Installed Files / Backups and uninstall actions only touch files recorded in the manager manifest. Unknown files are reported, not deleted.
+
+Config editing is available only for manager-installed files. Imported-but-not-installed mods show install-first guidance, and unknown/manual game files are not edited by the built-in config editor.
 
 ## Install From Source
 

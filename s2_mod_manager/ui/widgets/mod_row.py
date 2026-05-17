@@ -5,6 +5,7 @@ from dataclasses import dataclass, field
 
 import customtkinter as ctk
 
+from ...models.mod_state import mod_display_state
 from ..ui_tokens import UiTokens
 
 
@@ -491,17 +492,7 @@ def _thumbnail_label(mod: PlaceholderMod) -> str:
 
 
 def _compact_summary(mod: PlaceholderMod) -> str:
-    pieces = []
-    if mod.in_active_profile:
-        pieces.append(f"{mod.profile_name or 'Profile'}: {'Enabled' if mod.profile_enabled else 'Disabled'}")
-    elif mod.installed:
-        pieces.append("Installed")
-    elif mod.state == "library":
-        pieces.append("Available")
-    elif mod.state.startswith("candidate"):
-        pieces.append("Available")
-    else:
-        pieces.append(mod.state.replace("_", " ").title())
+    pieces = [mod_display_state(mod)]
     if mod.component_type:
         pieces.append(mod.component_type.replace("_", " ").upper())
     if mod.target_hint:
@@ -528,20 +519,24 @@ def _compact_status_color(mod: PlaceholderMod, tokens: UiTokens) -> str:
 
 def _compact_badges(mod: PlaceholderMod) -> str:
     values = []
-    if mod.in_active_profile:
-        values.append("ENABLED" if mod.profile_enabled else "DISABLED")
+    if mod.review_policy_text:
+        values.append("REVIEW")
+    elif mod.in_active_profile:
+        values.append("ON" if mod.profile_enabled else "OFF")
     elif mod.installed:
         values.append("INSTALLED")
     elif mod.state.startswith("candidate"):
-        values.append("AVAILABLE")
+        values.append("NEW")
     elif mod.state == "library":
-        values.append("AVAILABLE")
+        values.append("NEW")
     values.extend(str(value).upper() for value in mod.badges[:2])
     return " / ".join(dict.fromkeys(values))
 
 
 def _row_action_hint(mod: PlaceholderMod, *, can_toggle: bool, profile_protected: bool = False) -> str:
-    if mod.review_policy_text and not mod.in_active_profile:
+    if mod.review_policy_text:
+        if mod.in_active_profile and mod.profile_enabled and can_toggle:
+            return "toggle disables"
         return "needs review"
     if profile_protected:
         if mod.in_active_profile:

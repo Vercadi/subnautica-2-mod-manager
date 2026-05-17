@@ -86,6 +86,36 @@ def selection_from_review(review: ImportReview) -> ImportSelection:
     return ImportSelection(selected)
 
 
+def can_quick_install_review(review: ImportReview) -> bool:
+    """True when review contains only safe, unambiguous, supported components."""
+    if not review.sources:
+        return False
+    for source in review.sources:
+        if not source.importable or source.ambiguous or source.errors or source.unsafe_entries or source.unsupported_files:
+            return False
+        if not source.components:
+            return False
+        for component in source.components:
+            if component.component_type == COMPONENT_UNKNOWN or component.review_policy_text:
+                return False
+    return True
+
+
+def quick_install_selection(review: ImportReview) -> ImportSelection:
+    selected: dict[str, set[str]] = {}
+    for source in review.sources:
+        if not source.importable:
+            continue
+        component_ids = {
+            component.component_id
+            for component in source.components
+            if component.component_type != COMPONENT_UNKNOWN and not component.review_policy_text
+        }
+        if component_ids:
+            selected[source.source_key] = component_ids
+    return ImportSelection(selected)
+
+
 def import_review_selection(
     store: LibraryStore,
     review: ImportReview,

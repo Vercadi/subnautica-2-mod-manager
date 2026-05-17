@@ -18,7 +18,7 @@ class ImportReviewDialog(ctk.CTkToplevel):
         self.on_import = on_import
         self.source_vars: dict[str, tk.BooleanVar] = {}
         self.component_vars: dict[tuple[str, str], tk.BooleanVar] = {}
-        self.title("Scan Results / Import Review")
+        self.title("Scan Results / Install Review")
         self.configure(fg_color=tokens.colors.bg_abyss)
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(1, weight=1)
@@ -39,13 +39,13 @@ class ImportReviewDialog(ctk.CTkToplevel):
         header.grid_columnconfigure(0, weight=1)
         ctk.CTkLabel(
             header,
-            text="Scan Results / Import Review",
+            text="Scan Results / Install Review",
             text_color=c.text_primary,
             font=(t.font_family, t.section_title, "bold"),
         ).grid(row=0, column=0, sticky="w", padx=14, pady=(10, 2))
         ctk.CTkLabel(
             header,
-            text=self.review.summary_text + "  Game install writes remain disabled.",
+            text=self.review.summary_text + "  This step adds mods to the manager; game files change only when you click Apply.",
             text_color=c.text_secondary,
             font=(t.font_family, t.small),
         ).grid(row=1, column=0, sticky="w", padx=14, pady=(0, 10))
@@ -83,7 +83,7 @@ class ImportReviewDialog(ctk.CTkToplevel):
         ).grid(row=0, column=1, padx=(0, 8))
         ctk.CTkButton(
             footer,
-            text="Import Only",
+            text="Add Only",
             width=130,
             height=34,
             fg_color=c.glass_navy,

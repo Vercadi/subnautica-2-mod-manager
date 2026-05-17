@@ -100,6 +100,8 @@ class SettingsDialog(ctk.CTkToplevel):
             text_color=c.text_muted,
             font=(t.font_family, t.small),
             anchor="w",
+            wraplength=650,
+            justify="left",
         )
         self.result_label.grid(row=0, column=0, sticky="ew", padx=(0, 10))
         ctk.CTkButton(
