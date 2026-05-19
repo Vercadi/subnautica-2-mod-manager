@@ -46,9 +46,9 @@ if (Test-Path -LiteralPath $zipPath) {
     Remove-Item -LiteralPath $zipPath -Force
 }
 
-Add-Type -AssemblyName System.IO.Compression.FileSystem
-[System.IO.Compression.ZipFile]::CreateFromDirectory($dist, $zipPath, [System.IO.Compression.CompressionLevel]::Optimal, $true)
+python -m s2_mod_manager.tools.make_release_zip --source $dist --output $zipPath --root-name "Subnautica2ModManager"
 
+Add-Type -AssemblyName System.IO.Compression.FileSystem
 $zip = [System.IO.Compression.ZipFile]::OpenRead($zipPath)
 try {
     $forbidden = $zip.Entries | Where-Object {
