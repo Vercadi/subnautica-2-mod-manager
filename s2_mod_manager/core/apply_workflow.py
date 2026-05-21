@@ -62,7 +62,10 @@ def _disabled_reason(plan: DeploymentPlan, *, fake: bool, allow_apply: bool) -> 
         return ""
     blocking_errors = _blocking_errors(plan)
     if blocking_errors:
-        return "Plan has errors that must be fixed before install: " + "; ".join(blocking_errors[:3])
+        missing_source = _missing_source_guidance(blocking_errors)
+        if missing_source:
+            return missing_source
+        return "Fix this before install: " + "; ".join(blocking_errors[:3])
     if plan.blocked_actions:
         return (
             "Only review-required items are selected. Manual review is needed for blocked loose overlays; "
@@ -90,3 +93,21 @@ def _blocking_errors(plan: DeploymentPlan) -> list[str]:
 def _is_review_only_error(error: str) -> bool:
     lowered = str(error or "").casefold()
     return "requires manual review before deployment" in lowered or "loose overlay" in lowered
+
+
+def _missing_source_guidance(errors: list[str]) -> str:
+    for error in errors:
+        lowered = error.casefold()
+        if "source copy is missing" in lowered or "source file is missing" in lowered or "missing its library source" in lowered:
+            name = error.split(" source ", 1)[0].split(" is missing", 1)[0].strip() or "One mod"
+            return (
+                f"{name} is missing its manager copy. Disable or Remove it, then click Apply; "
+                "reinstall that mod if you want to use it again."
+            )
+        if "missing from the imported library" in lowered:
+            name = error.split(" is missing", 1)[0].strip() or "One profile entry"
+            return (
+                f"{name} is no longer in the manager library. Open Profiles, remove that missing entry, then click Apply; "
+                "reinstall that mod if you want it back."
+            )
+    return ""

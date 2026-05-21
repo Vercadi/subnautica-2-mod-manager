@@ -1,4 +1,4 @@
 from __future__ import annotations
 
 __app_name__ = "Subnautica 2 Mod Manager"
-__version__ = "0.1.4"
+__version__ = "0.2.0"

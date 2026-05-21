@@ -65,8 +65,8 @@ def selection_action_states(
     """Compute main action availability for the current row selection."""
     selected = [mod for mod in mods if getattr(mod, "component_id", "")]
     any_selected = bool(selected)
-    any_installed = any(bool(getattr(mod, "installed", False)) for mod in selected)
     any_review = any(_truthy(getattr(mod, "review_policy_text", "")) for mod in selected)
+    any_in_profile = any(bool(getattr(mod, "in_active_profile", False)) for mod in selected)
     enable_targets = [
         mod for mod in selected
         if _can_enable(mod, active_profile_protected=active_profile_protected)
@@ -77,10 +77,11 @@ def selection_action_states(
         and bool(getattr(mod, "profile_enabled", False))
         and not active_profile_protected
     ]
-    removable = [
+    removable_profile_targets = [
         mod for mod in selected
-        if not bool(getattr(mod, "installed", False))
+        if bool(getattr(mod, "in_active_profile", False)) and not active_profile_protected
     ]
+    any_installed = any(bool(getattr(mod, "installed", False)) for mod in selected)
 
     return {
         "Apply": SelectionActionState(
@@ -96,8 +97,8 @@ def selection_action_states(
             "Vanilla cannot be edited." if active_profile_protected else _selection_reason(any_selected, False, "No selected enabled mods."),
         ),
         "Remove": SelectionActionState(
-            bool(removable),
-            "Installed mods need Uninstall." if any_installed and not removable else _selection_reason(any_selected, False, "Select available mods to remove."),
+            bool(removable_profile_targets),
+            "" if removable_profile_targets else "Vanilla cannot be edited." if active_profile_protected and any_in_profile else _selection_reason(any_selected, False, "Select mods in the active profile to remove."),
         ),
         "Uninstall": SelectionActionState(
             bool(any_installed),

@@ -109,6 +109,29 @@ from .widgets.settings_dialog import SettingsDialog
 log = logging.getLogger(__name__)
 
 
+def _add_corner_brackets(master, *, tokens: UiTokens, color: str) -> None:
+    length = max(18, tokens.outer_margin + 6)
+    thickness = 3
+    inset = 6
+    for name, relx, rely, anchor, width, height in (
+        ("tl_h", 0, 0, "nw", length, thickness),
+        ("tl_v", 0, 0, "nw", thickness, length),
+        ("tr_h", 1, 0, "ne", length, thickness),
+        ("tr_v", 1, 0, "ne", thickness, length),
+        ("bl_h", 0, 1, "sw", length, thickness),
+        ("bl_v", 0, 1, "sw", thickness, length),
+        ("br_h", 1, 1, "se", length, thickness),
+        ("br_v", 1, 1, "se", thickness, length),
+    ):
+        segment = ctk.CTkFrame(master, fg_color=color, corner_radius=2, width=width, height=height)
+        segment.place(relx=relx, rely=rely, anchor=anchor, x=inset if relx == 0 else -inset, y=inset if rely == 0 else -inset)
+        segment.lift()
+        try:
+            master.after_idle(segment.lift)
+        except Exception:
+            pass
+
+
 class AppWindow(ctk.CTk):
     def __init__(self):
         ctk.set_appearance_mode("dark")
@@ -204,12 +227,13 @@ class AppWindow(ctk.CTk):
 
         shell = ctk.CTkFrame(
             self,
-            fg_color="#041420",
-            corner_radius=t.shell_radius,
+            fg_color=c.glass_black,
+            corner_radius=t.shell_radius + 4,
             border_width=2,
             border_color=c.shell_border,
         )
         shell.place(relx=0.04, rely=0.052, relwidth=0.92, relheight=0.89)
+        _add_corner_brackets(shell, tokens=t, color=c.accent_lagoon)
         shell.grid_columnconfigure(0, minsize=t.nav_width)
         shell.grid_columnconfigure(1, weight=1)
         shell.grid_rowconfigure(0, minsize=t.top_bar_height)
@@ -312,7 +336,7 @@ class AppWindow(ctk.CTk):
         c = t.colors
         hud = tk.Canvas(self, width=150, height=190, highlightthickness=0, bg=c.bg_abyss, bd=0)
         self._outer_hud = hud
-        hud.create_rectangle(8, 8, 142, 182, outline=c.shell_border_dim, fill="#04131E", width=1)
+        hud.create_rectangle(8, 8, 142, 182, outline=c.shell_border_dim, fill=c.glass_black, width=1)
         hud.create_text(34, 30, text="DEPTH", fill=c.accent_lagoon, font=("Segoe UI", 10, "bold"))
         hud.create_text(51, 58, text="186", fill=c.accent_lagoon, font=("Segoe UI", 24, "bold"))
         hud.create_text(88, 60, text="m", fill=c.text_secondary, font=("Segoe UI", 11))
@@ -858,12 +882,10 @@ class AppWindow(ctk.CTk):
         service = RecoveryService(self.manifest_store, BackupStore(self.dirs.backup_dir))
         result = service.uninstall_components(component_ids)
         self._remove_components_from_active_profile(component_ids)
-        self.hidden_inbox_hashes.update(self._source_hashes_for_components(component_ids))
-        removed_from_list = self.library_store.remove_components(component_ids)
         self._refresh_library_view(refresh_recovery=True, refresh_diagnostics=True)
         text = uninstall_result_text(result)
-        if removed_from_list:
-            text += f" Removed {removed_from_list} mod(s) from the manager list."
+        if result.ok:
+            text += " The mod remains available in the manager list so it can be installed again later."
         self._console_write(text)
         self._console_write(self.recovery_summary.text)
         self._record_activity("uninstall selected mods", "completed" if result.ok else "failed", details=text)
@@ -873,18 +895,20 @@ class AppWindow(ctk.CTk):
         if not component_ids:
             self._console_write("Remove: select one or more mods first.")
             return
-        installed = self._installed_component_ids()
-        blocked = [component_id for component_id in component_ids if component_id in installed]
-        removable = [component_id for component_id in component_ids if component_id not in installed]
-        if blocked:
-            self._console_write("Remove: installed mods need Uninstall first. Unknown/manual files are left alone.")
-        if not removable:
-            return
-        self._remove_components_from_active_profile(removable)
-        self.hidden_inbox_hashes.update(self._source_hashes_for_components(removable))
-        removed = self.library_store.remove_components(removable)
+        removed_from_profile = self._remove_components_from_active_profile(component_ids)
+        removable_from_library = [
+            component_id
+            for component_id in component_ids
+            if component_id not in self._installed_component_ids()
+        ]
+        self.hidden_inbox_hashes.update(self._source_hashes_for_components(removable_from_library))
+        removed = self.library_store.remove_components(removable_from_library)
         self._refresh_library_view(refresh_recovery=True, refresh_diagnostics=True)
-        self._console_write(f"Removed {removed} mod(s) from the manager list.")
+        self._console_write(
+            f"Removed {removed_from_profile} profile entr{'y' if removed_from_profile == 1 else 'ies'} "
+            f"and {removed} uninstalled mod(s) from the manager list. "
+            "Installed game files change only when you click Apply or Uninstall."
+        )
         self._record_activity("mod list", "removed", details=f"{removed} removed")
 
     def _remove_components_from_active_profile(self, component_ids: list[str]) -> int:
@@ -914,10 +938,13 @@ class AppWindow(ctk.CTk):
             self._console_write("Reset to Vanilla cancelled.")
             return
         self.profile_store.set_active_profile(VANILLA_PROFILE_ID)
-        self._refresh_library_view(rebuild_library=False, refresh_recovery=True)
-        self._console_write(f"Active profile: Vanilla. {self._pending_change_text()}")
-        self._record_activity("profile", "reset preview", target="Vanilla")
-        self.preview_deployment()
+        service = RecoveryService(self.manifest_store, BackupStore(self.dirs.backup_dir))
+        result = service.uninstall_all()
+        self._refresh_library_view(rebuild_library=False, refresh_recovery=True, refresh_diagnostics=True)
+        text = uninstall_result_text(result)
+        self._console_write(f"Reset to Vanilla: active profile is Vanilla. {text} Unknown/manual files were left alone.")
+        self._console_write(self.recovery_summary.text)
+        self._record_activity("profile", "reset to vanilla", target="Vanilla", details=text)
 
     def preview_deployment(self) -> None:
         self._refresh_library_view(rebuild_library=False)

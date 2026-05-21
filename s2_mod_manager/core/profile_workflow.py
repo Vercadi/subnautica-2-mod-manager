@@ -49,7 +49,7 @@ def build_loadout_warnings(
         if entry.enabled and entry.component_id in components_by_id
     ]
     has_runtime = ue4ss_runtime_installed or any(
-        component.component_type == COMPONENT_UE4SS_RUNTIME for component in enabled_components
+        _is_ue4ss_runtime_component(component) for component in enabled_components
     )
 
     warnings: list[LoadoutWarning] = []
@@ -69,7 +69,7 @@ def build_loadout_warnings(
         policy = review_policy_for_component(component)
         if policy is not None:
             warnings.append(LoadoutWarning(component.component_id, policy.text, "warning"))
-        if entry.enabled and component.component_type == COMPONENT_UE4SS_MOD and not has_runtime:
+        if entry.enabled and _is_ue4ss_mod_component(component) and not has_runtime:
             warnings.append(
                 LoadoutWarning(
                     component.component_id,
@@ -110,6 +110,27 @@ def loadout_chips(
 
 def profile_contains(profile: ModProfile, component_id: str) -> bool:
     return any(entry.component_id == component_id for entry in profile.entries)
+
+
+def _is_ue4ss_runtime_component(component: LibraryComponent) -> bool:
+    if component.component_type == COMPONENT_UE4SS_RUNTIME:
+        return True
+    if component.install_kind == COMPONENT_UE4SS_RUNTIME:
+        return True
+    badges = " ".join(component.badges).casefold()
+    if "ue4ss" in badges and "runtime" in badges:
+        return True
+    name = component.display_name.casefold()
+    return "ue4ss" in name and "runtime" in name
+
+
+def _is_ue4ss_mod_component(component: LibraryComponent) -> bool:
+    if component.component_type == COMPONENT_UE4SS_MOD:
+        return True
+    if component.install_kind == COMPONENT_UE4SS_MOD:
+        return True
+    badges = " ".join(component.badges).casefold()
+    return "ue4ss" in badges and "runtime" not in badges
 
 
 def _dedupe_warnings(warnings: list[LoadoutWarning]) -> list[LoadoutWarning]:

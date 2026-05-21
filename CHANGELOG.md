@@ -1,5 +1,38 @@
 # Changelog
 
+## 0.2.0
+
+Visual polish pass based on the Subnautica 2 in-game PDA screenshots.
+
+Changed:
+
+- Restyled the main shell toward an S2 PDA surface with brighter cyan outlines, darker glass panels, subtle hex texture, and cyan corner brackets.
+- Moved the selected-mod inspector to the right side so the mod list remains the main workspace.
+- Changed active navigation, profile selector, and Apply styling toward the amber in-game selected-state language.
+- Improved compact mod rows and review-required presentation; loose/review-required entries now read as `Limited Access` visually.
+- Kept the proven 0.1.5 install/apply/remove/uninstall behavior unchanged.
+
+## 0.1.5
+
+Stabilization pass focused on the confusing Apply/Remove/Uninstall cases reported after 0.1.4.
+
+Changed:
+
+- Remove is now profile-only and works for installed mods; it creates a visible pending Apply change instead of telling users to uninstall first.
+- Uninstall removes manager-installed game files from the manifest and keeps the mod available in the manager list for reinstall later.
+- Reset to Vanilla now switches to Vanilla and runs manifest-backed uninstall directly, leaving unknown/manual files alone.
+- Apply can still install supported mods while unrelated loose/review-required items are present; blocked loose overlays are skipped rather than softlocking safe changes.
+- Disabled profile entries whose manager/library copy is missing no longer block cleanup of already installed files.
+- Missing-source Apply refusals now give one next step instead of a technical error block.
+- UE4SS runtime warning detection now recognizes runtime-like imported packages by install kind, badges, and display name to avoid false warnings when runtime is enabled.
+
+Safety:
+
+- Unknown/manual files are still never deleted.
+- Loose overlays and SN2P-style root overlays remain review-required and skipped by automatic Apply.
+- Manifest-backed uninstall and reset do not depend on library/source archives still being present.
+- Critical uninstall/reset confirmations remain non-disableable.
+
 ## 0.1.4
 
 UX clarity, installed-config editing, and responsiveness hardening.

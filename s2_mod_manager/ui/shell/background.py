@@ -99,6 +99,23 @@ def _procedural_underwater(width: int, height: int) -> Image.Image:
         color = (3, 20 + layer * 8, 30 + layer * 9, 100 + layer * 22)
         draw.polygon(points, fill=color)
 
+    # PDA-style hex mesh, deliberately subtle so it reads as texture, not noise.
+    hex_size = max(26, min(44, width // 42))
+    hex_h = int(hex_size * 0.86)
+    mesh_color = (104, 224, 242, 15)
+    for row, y in enumerate(range(-hex_h, height + hex_h, hex_h)):
+        x_offset = -hex_size if row % 2 else -(hex_size // 2)
+        for x in range(x_offset, width + hex_size, hex_size * 2):
+            points = [
+                (x + hex_size // 2, y),
+                (x + hex_size + hex_size // 2, y),
+                (x + hex_size * 2, y + hex_h // 2),
+                (x + hex_size + hex_size // 2, y + hex_h),
+                (x + hex_size // 2, y + hex_h),
+                (x, y + hex_h // 2),
+            ]
+            draw.line(points + [points[0]], fill=mesh_color, width=1)
+
     # Coral glow clusters.
     for _ in range(42):
         x = rng.choice([rng.randint(0, int(width * 0.18)), rng.randint(int(width * 0.76), width)])
@@ -129,6 +146,12 @@ def _procedural_underwater(width: int, height: int) -> Image.Image:
         (int(width * 0.045), int(height * 0.055), int(width * 0.955), int(height * 0.94)),
         radius=24,
         fill=(0, 8, 14, 58),
+    )
+    vdraw.rounded_rectangle(
+        (int(width * 0.04), int(height * 0.05), int(width * 0.96), int(height * 0.945)),
+        radius=28,
+        outline=(122, 233, 250, 35),
+        width=2,
     )
     image = Image.alpha_composite(image.convert("RGBA"), vignette)
     return image.filter(ImageFilter.SMOOTH_MORE).convert("RGB")

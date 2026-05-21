@@ -65,12 +65,13 @@ class ModRow(ctk.CTkFrame):
     ):
         colors = tokens.colors
         warned = bool(mod.warning or mod.profile_warning)
+        limited = bool(mod.review_policy_text)
         super().__init__(
             master,
-            fg_color=colors.glass_cyan if selected else colors.glass_navy,
-            corner_radius=tokens.row_radius,
+            fg_color=colors.panel_glass if selected else colors.glass_navy,
+            corner_radius=tokens.row_radius + 3,
             border_width=1,
-            border_color=colors.shell_border if selected else colors.warning if warned else colors.border_soft,
+            border_color=colors.shell_border if selected else colors.limited_red if limited else colors.warning if warned else colors.border_soft,
         )
         self.tokens = tokens
         self.mod = mod
@@ -90,7 +91,7 @@ class ModRow(ctk.CTkFrame):
         self.title_label: ctk.CTkLabel | None = None
         self.badges_label: ctk.CTkLabel | None = None
         self.profile_switch: ctk.CTkSwitch | None = None
-        self._has_warning_button = bool(mod.warning or mod.profile_warning)
+        self._has_warning_button = bool(mod.warning or mod.profile_warning or mod.review_policy_text)
         if self.compact:
             self.configure(height=44)
             self.grid_propagate(False)
@@ -132,19 +133,19 @@ class ModRow(ctk.CTkFrame):
         for index, (badge, color) in enumerate(_row_badges(self.mod, t)):
             _badge(badges, t, badge, color).grid(row=0, column=index, padx=(0, 5))
 
-        if self.mod.warning or self.mod.profile_warning:
+        if self.mod.warning or self.mod.profile_warning or self.mod.review_policy_text:
             ctk.CTkButton(
                 self,
-                text="WARN",
-                width=48,
+                text="LIMIT" if self.mod.review_policy_text else "WARN",
+                width=54,
                 height=24,
-                fg_color="transparent",
+                fg_color=c.active_amber if self.mod.review_policy_text else "transparent",
                 hover_color=c.panel_glass_hover,
                 border_width=1,
-                border_color=c.warning,
-                corner_radius=5,
+                border_color=c.limited_red if self.mod.review_policy_text else c.warning,
+                corner_radius=t.button_radius,
                 font=(t.font_family, t.tiny, "bold"),
-                text_color=c.warning,
+                text_color=c.text_primary if self.mod.review_policy_text else c.warning,
                 command=self._warning_clicked,
             ).grid(row=0, column=2, rowspan=3, padx=(0, 8))
 
@@ -157,7 +158,7 @@ class ModRow(ctk.CTkFrame):
             width=48,
             progress_color=c.accent_lagoon,
             button_color=c.text_primary,
-            fg_color=c.disabled,
+            fg_color=c.active_amber if self.mod.review_policy_text else c.disabled,
             state="normal" if self.can_toggle else "disabled",
             command=self._toggle_clicked,
         )
@@ -242,19 +243,19 @@ class ModRow(ctk.CTkFrame):
 
         actions = ctk.CTkFrame(self, fg_color="transparent")
         actions.grid(row=0, column=4, sticky="e", padx=(0, 10), pady=6)
-        if self.mod.warning or self.mod.profile_warning:
+        if self.mod.warning or self.mod.profile_warning or self.mod.review_policy_text:
             ctk.CTkButton(
                 actions,
                 text="!",
                 width=28,
                 height=26,
-                fg_color="transparent",
+                fg_color=c.active_amber if self.mod.review_policy_text else "transparent",
                 hover_color=c.panel_glass_hover,
                 border_width=1,
-                border_color=c.warning,
-                corner_radius=5,
+                border_color=c.limited_red if self.mod.review_policy_text else c.warning,
+                corner_radius=t.button_radius,
                 font=(t.font_family, t.small, "bold"),
-                text_color=c.warning,
+                text_color=c.text_primary if self.mod.review_policy_text else c.warning,
                 command=self._warning_clicked,
             ).grid(row=0, column=0, padx=(0, 6))
         self.profile_switch = ctk.CTkSwitch(
@@ -263,7 +264,7 @@ class ModRow(ctk.CTkFrame):
             width=46,
             progress_color=c.accent_lagoon,
             button_color=c.text_primary,
-            fg_color=c.disabled,
+            fg_color=c.active_amber if self.mod.review_policy_text else c.disabled,
             state="normal" if self.can_toggle else "disabled",
             command=self._toggle_clicked,
         )
@@ -302,9 +303,10 @@ class ModRow(ctk.CTkFrame):
     def set_selected(self, selected: bool) -> None:
         colors = self.tokens.colors
         warned = bool(self.mod.warning or self.mod.profile_warning)
+        limited = bool(self.mod.review_policy_text)
         self.configure(
-            fg_color=colors.glass_cyan if selected else colors.glass_navy,
-            border_color=colors.shell_border if selected else colors.warning if warned else colors.border_soft,
+            fg_color=colors.panel_glass if selected else colors.glass_navy,
+            border_color=colors.shell_border if selected else colors.limited_red if limited else colors.warning if warned else colors.border_soft,
         )
         if self.indicator is not None:
             self.indicator.configure(bg=self.cget("fg_color"))
@@ -326,7 +328,7 @@ class ModRow(ctk.CTkFrame):
         """
         if not self.compact:
             return False
-        if bool(mod.warning or mod.profile_warning) != self._has_warning_button:
+        if bool(mod.warning or mod.profile_warning or mod.review_policy_text) != self._has_warning_button:
             return False
         self.mod = mod
         self.can_toggle = can_toggle
@@ -446,7 +448,7 @@ def _row_badges(mod: PlaceholderMod, tokens: UiTokens) -> list[tuple[str, str]]:
     if mod.deployment_status:
         badges.append((f"Plan {mod.deployment_status}", c.chip_blue))
     if mod.review_policy_text:
-        badges.append(("Needs Review", c.chip_orange))
+        badges.append(("Limited Access", c.chip_orange))
     elif mod.warning or mod.profile_warning:
         badges.append(("Warning", c.chip_orange))
     if len(badges) > 6:
@@ -459,7 +461,7 @@ def _status_color(status: str, tokens: UiTokens) -> str:
     normalized = status.casefold()
     if normalized in {"library", "scanned", "imported", "compatible", "ready to apply"}:
         return c.chip_green
-    if normalized in {"candidate", "review", "needs review", "ready to import"}:
+    if normalized in {"candidate", "review", "needs review", "limited access", "ready to import"}:
         return c.chip_orange
     if "conflict" in normalized or "missing" in normalized:
         return c.chip_orange
@@ -475,7 +477,7 @@ def _badge_color(text: str, tokens: UiTokens) -> str:
         return c.chip_purple
     if "runtime" in normalized:
         return c.chip_green
-    if "loose" in normalized or "review" in normalized:
+    if "loose" in normalized or "review" in normalized or "limited" in normalized:
         return c.chip_orange
     return c.border_cold
 
@@ -505,7 +507,7 @@ def _compact_summary(mod: PlaceholderMod) -> str:
 def _compact_status_color(mod: PlaceholderMod, tokens: UiTokens) -> str:
     c = tokens.colors
     if mod.review_policy_text:
-        return c.warning
+        return c.limited_red
     if mod.in_active_profile:
         return c.accent_biolume if mod.profile_enabled else c.disabled
     if mod.installed:
@@ -520,9 +522,9 @@ def _compact_status_color(mod: PlaceholderMod, tokens: UiTokens) -> str:
 def _compact_badges(mod: PlaceholderMod) -> str:
     values = []
     if mod.review_policy_text:
-        values.append("REVIEW")
+        values.append("LIMITED")
     elif mod.in_active_profile:
-        values.append("ON" if mod.profile_enabled else "OFF")
+        values.append("ENABLED" if mod.profile_enabled else "DISABLED")
     elif mod.installed:
         values.append("INSTALLED")
     elif mod.state.startswith("candidate"):

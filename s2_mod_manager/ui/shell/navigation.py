@@ -37,7 +37,7 @@ class NavigationRail(ctk.CTkFrame):
         c = self.tokens.colors
         ctk.CTkLabel(
             self,
-            text="DIVE SYSTEMS",
+            text="PDA SYSTEMS",
             text_color=c.text_muted,
             font=(self.tokens.font_family, self.tokens.tiny, "bold"),
             anchor="w",
@@ -60,7 +60,7 @@ class NavigationRail(ctk.CTkFrame):
             row,
             width=4,
             height=30,
-            fg_color=c.accent_lagoon if active else "transparent",
+            fg_color=c.accent_pressure if active else "transparent",
             corner_radius=3,
         ).grid(row=0, column=0, sticky="nsw", padx=(0, 6), pady=5)
         ctk.CTkButton(
@@ -68,12 +68,12 @@ class NavigationRail(ctk.CTkFrame):
             text=f"{icon}  {label}",
             anchor="w",
             height=40,
-            corner_radius=7,
-            fg_color=c.glass_cyan if active else "transparent",
+            corner_radius=t.button_radius,
+            fg_color=c.active_amber if active else "transparent",
             hover_color=c.panel_glass_hover,
             border_width=1 if active else 0,
-            border_color=c.shell_border if active else c.border_soft,
-            text_color=c.text_primary if active else c.text_secondary,
+            border_color=c.accent_pressure if active else c.border_soft,
+            text_color=c.text_primary if active else c.accent_lagoon,
             font=(t.font_family, t.body, "bold" if active else "normal"),
             command=lambda value=label: self._clicked(value),
         ).grid(row=0, column=1, sticky="ew")

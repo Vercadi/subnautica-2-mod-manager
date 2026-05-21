@@ -38,6 +38,11 @@ assets/app_icon_placeholder.svg
 assets/app_icon_source.png
 scripts/capture_release_screenshots.py
 
+# Local agent/skill installs
+.codex/
+.agents/
+skills-lock.json
+
 # Local mod inbox lives beside this repo at ..\Mods
 # Do not create a second in-repo Mods folder unless the layout changes.
 Mods/

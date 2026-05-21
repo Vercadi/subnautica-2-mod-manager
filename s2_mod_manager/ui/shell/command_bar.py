@@ -22,10 +22,10 @@ class CommandBar(ctk.CTkFrame):
         colors = tokens.colors
         super().__init__(
             master,
-            fg_color=colors.glass_black,
-            corner_radius=tokens.panel_radius,
+            fg_color=colors.bg_trench,
+            corner_radius=tokens.panel_radius + 4,
             border_width=1,
-            border_color=colors.shell_border_dim,
+            border_color=colors.border_cold,
         )
         self.tokens = tokens
         self.path_text = path_text
@@ -52,11 +52,11 @@ class CommandBar(ctk.CTkFrame):
 
         self.badge_label = ctk.CTkLabel(
             self,
-            text=self.build_text or f"Community Build  {__version__}",
+            text=self._compact_build_text(),
             font=(t.font_family, t.tiny, "bold"),
-            text_color=c.accent_biolume,
-            fg_color=c.glass_cyan,
-            corner_radius=5,
+            text_color=c.accent_pressure,
+            fg_color=c.active_amber,
+            corner_radius=12,
             padx=10,
             pady=4,
         )
@@ -64,17 +64,17 @@ class CommandBar(ctk.CTkFrame):
 
         self.path_label = ctk.CTkLabel(
             self,
-            text=f"[DIR] {self._compact_path_text()}",
+            text=f"DIR  {self._compact_path_text()}",
             font=(t.font_family, t.body),
             text_color=c.text_secondary,
             fg_color=c.glass_navy,
-            corner_radius=7,
+            corner_radius=10,
             padx=12,
             pady=9,
         )
         self.path_label.grid(row=0, column=2, sticky="ew", padx=(0, 18))
 
-        launch = _command_button(self, t, "[>] Launch", primary=True, width=116)
+        launch = _command_button(self, t, "Launch", primary=True, width=116)
         launch.configure(command=self._launch_clicked)
         launch.grid(row=0, column=3, padx=(0, 10), pady=12)
 
@@ -118,18 +118,29 @@ class CommandBar(ctk.CTkFrame):
         self.path_text = path_text
         self.build_text = build_text
         if self.path_label is not None:
-            self.path_label.configure(text=f"[DIR] {self._compact_path_text()}")
+            self.path_label.configure(text=f"DIR  {self._compact_path_text()}")
         if self.badge_label is not None:
-            self.badge_label.configure(text=self.build_text or f"Community Build  {__version__}")
+            self.badge_label.configure(text=self._compact_build_text())
+
+    def _compact_build_text(self) -> str:
+        text = str(self.build_text or "").strip()
+        if not text:
+            return f"Community Build  {__version__}"
+        if len(text) <= 34:
+            return text
+        parts = [part.strip() for part in text.split("/") if part.strip()]
+        if len(parts) >= 2:
+            return f"{parts[0]} / {parts[-1]}"
+        return text[:31] + "..."
 
 
 def _command_button(master, tokens: UiTokens, text: str, *, primary: bool = False, width: int = 112) -> ctk.CTkButton:
     colors = tokens.colors
     if primary:
-        fg = "#176EC4"
-        hover = "#2186E0"
+        fg = colors.glass_cyan
+        hover = colors.panel_glass_hover
         text_color = colors.text_primary
-        border_color = "#2E9CF2"
+        border_color = colors.shell_border
     else:
         fg = colors.glass_navy
         hover = colors.panel_glass

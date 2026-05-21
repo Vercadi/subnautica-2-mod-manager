@@ -159,8 +159,8 @@ class InstalledModsTab(ctk.CTkFrame):
         self.preview_button: ctk.CTkButton | None = None
         self.preview_reason_label: ctk.CTkLabel | None = None
         self.action_buttons: dict[str, ctk.CTkButton] = {}
-        self.grid_columnconfigure(0, weight=0, minsize=330)
-        self.grid_columnconfigure(1, weight=1)
+        self.grid_columnconfigure(0, weight=1)
+        self.grid_columnconfigure(1, weight=0, minsize=tokens.inspector_width)
         self.grid_rowconfigure(0, weight=1)
         self._build()
 
@@ -170,12 +170,12 @@ class InstalledModsTab(ctk.CTkFrame):
         center = ctk.CTkFrame(
             self,
             fg_color=c.glass_black,
-            corner_radius=t.panel_radius,
+            corner_radius=t.panel_radius + 4,
             border_width=1,
             border_color=c.shell_border_dim,
         )
         self.center_panel = center
-        center.grid(row=0, column=1, sticky="nsew", padx=(t.panel_gap, 0), pady=0)
+        center.grid(row=0, column=0, sticky="nsew", padx=(0, t.panel_gap), pady=0)
         center.grid_columnconfigure(0, weight=1)
         center.grid_columnconfigure(1, weight=0, minsize=150)
         center.grid_rowconfigure(0, weight=1)
@@ -193,7 +193,7 @@ class InstalledModsTab(ctk.CTkFrame):
             on_restore_config=self.on_restore_config,
             on_open_config_folder=self.on_open_config_folder,
         )
-        self.inspector.grid(row=0, column=0, sticky="nsw", pady=0)
+        self.inspector.grid(row=0, column=1, sticky="nse", pady=0)
 
         self.list_frame = ctk.CTkScrollableFrame(
             center,
@@ -394,13 +394,23 @@ class InstalledModsTab(ctk.CTkFrame):
     def _build_side_controls(self, parent) -> ctk.CTkFrame:
         t = self.tokens
         c = t.colors
-        side = ctk.CTkFrame(parent, fg_color=c.glass_navy, corner_radius=t.row_radius)
+        side = ctk.CTkFrame(
+            parent,
+            width=166,
+            fg_color=c.glass_navy,
+            corner_radius=t.row_radius + 4,
+            border_width=1,
+            border_color=c.border_soft,
+        )
+        side.grid_propagate(False)
         side.grid_columnconfigure(0, weight=1)
         self.count_label = ctk.CTkLabel(
             side,
             text=self._count_text(),
             font=(t.font_family, t.small, "bold"),
             text_color=c.text_primary,
+            wraplength=142,
+            justify="left",
         )
         self.count_label.grid(row=0, column=0, sticky="ew", padx=10, pady=(10, 6))
 
@@ -410,8 +420,8 @@ class InstalledModsTab(ctk.CTkFrame):
             values=self.profile_names,
             command=self._profile_selected,
             fg_color=c.glass_black,
-            button_color=c.glass_cyan,
-            button_hover_color=c.panel_glass_hover,
+            button_color=c.active_amber,
+            button_hover_color=c.active_amber_hover,
             text_color=c.text_primary,
             width=112,
         )
@@ -449,15 +459,18 @@ class InstalledModsTab(ctk.CTkFrame):
             ("Reset to Vanilla", self._reset_to_vanilla_clicked, False),
         )
         for index, (text, command, primary) in enumerate(buttons, start=5):
+            primary_fg = c.active_amber if text == "Apply" else c.glass_cyan
+            primary_hover = c.active_amber_hover if text == "Apply" else c.panel_glass_hover
+            primary_border = c.accent_pressure if text == "Apply" else c.shell_border
             button = ctk.CTkButton(
                 side,
                 text=text,
                 width=132,
                 height=24,
-                fg_color=c.glass_cyan if primary else c.glass_black,
-                hover_color=c.panel_glass_hover if primary else c.panel_glass,
+                fg_color=primary_fg if primary else c.glass_black,
+                hover_color=primary_hover if primary else c.panel_glass,
                 border_width=1,
-                border_color=c.shell_border if primary else c.border_cold,
+                border_color=primary_border if primary else c.border_cold,
                 text_color=c.text_primary if primary else c.text_secondary,
                 font=(t.font_family, t.tiny, "bold"),
                 command=command,
@@ -570,9 +583,9 @@ class InstalledModsTab(ctk.CTkFrame):
         for button in filter(None, (self.preview_button, self.action_buttons.get("Apply"))):
             button.configure(
                 text=text,
-                fg_color=c.glass_cyan if enabled else c.disabled,
-                hover_color=c.panel_glass_hover if enabled else c.disabled,
-                border_color=c.shell_border if enabled else c.border_soft,
+                fg_color=c.active_amber if enabled else c.disabled,
+                hover_color=c.active_amber_hover if enabled else c.disabled,
+                border_color=c.accent_pressure if enabled else c.border_soft,
                 text_color=c.text_primary if enabled else c.text_muted,
                 state="normal" if enabled else "disabled",
             )
@@ -598,9 +611,9 @@ class InstalledModsTab(ctk.CTkFrame):
             enabled = action_state.enabled
             button.configure(
                 state="normal" if enabled else "disabled",
-                fg_color=c.glass_cyan if primary and enabled else c.glass_black if enabled else c.disabled,
-                hover_color=c.panel_glass_hover if enabled else c.disabled,
-                border_color=c.shell_border if primary and enabled else c.border_cold if enabled else c.border_soft,
+                fg_color=c.active_amber if primary and enabled else c.glass_black if enabled else c.disabled,
+                hover_color=c.active_amber_hover if primary and enabled else c.panel_glass if enabled else c.disabled,
+                border_color=c.accent_pressure if primary and enabled else c.border_cold if enabled else c.border_soft,
                 text_color=c.text_primary if enabled else c.text_muted,
             )
         if self.preview_reason_label is not None and not states.get("Apply").enabled:
@@ -729,10 +742,6 @@ class InstalledModsTab(ctk.CTkFrame):
         component_ids = [mod.component_id for mod in mods if mod.in_active_profile and mod.component_id]
         if component_ids and self.on_remove_selected_profile_entries:
             self.on_remove_selected_profile_entries(component_ids)
-            self.selected_bulk_ids.difference_update(_mod_key(mod) for mod in mods)
-        list_component_ids = [mod.component_id for mod in mods if mod.component_id and not mod.installed]
-        if list_component_ids and self.on_remove_selected_mods:
-            self.on_remove_selected_mods(list_component_ids)
             self.selected_bulk_ids.difference_update(_mod_key(mod) for mod in mods)
 
     def _uninstall_selected_clicked(self) -> None:

@@ -9,6 +9,29 @@ from .mod_row import PlaceholderMod, _fit_text
 from ...models.mod_state import mod_display_state
 
 
+def _add_pda_corner_brackets(master, *, tokens: UiTokens, color: str) -> None:
+    length = max(14, tokens.outer_margin)
+    thickness = 2
+    inset = 5
+    for relx, rely, anchor, width, height in (
+        (0, 0, "nw", length, thickness),
+        (0, 0, "nw", thickness, length),
+        (1, 0, "ne", length, thickness),
+        (1, 0, "ne", thickness, length),
+        (0, 1, "sw", length, thickness),
+        (0, 1, "sw", thickness, length),
+        (1, 1, "se", length, thickness),
+        (1, 1, "se", thickness, length),
+    ):
+        segment = ctk.CTkFrame(master, fg_color=color, corner_radius=2, width=width, height=height)
+        segment.place(relx=relx, rely=rely, anchor=anchor, x=inset if relx == 0 else -inset, y=inset if rely == 0 else -inset)
+        segment.lift()
+        try:
+            master.after_idle(segment.lift)
+        except Exception:
+            pass
+
+
 class ModInspector(ctk.CTkFrame):
     def __init__(
         self,
@@ -29,10 +52,10 @@ class ModInspector(ctk.CTkFrame):
         super().__init__(
             master,
             width=tokens.inspector_width,
-            fg_color=colors.glass_black,
-            corner_radius=tokens.panel_radius,
+            fg_color=colors.glass_navy,
+            corner_radius=tokens.panel_radius + 4,
             border_width=1,
-            border_color=colors.border_cold,
+            border_color=colors.shell_border_dim,
         )
         self.tokens = tokens
         self.mod = mod
@@ -55,6 +78,7 @@ class ModInspector(ctk.CTkFrame):
         self.grid_propagate(False)
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(2, weight=1)
+        _add_pda_corner_brackets(self, tokens=tokens, color=colors.accent_lagoon)
         self._build()
 
     def set_mod(self, mod: PlaceholderMod, *, active_tab: str | None = None) -> None:
@@ -107,11 +131,11 @@ class ModInspector(ctk.CTkFrame):
         tabs = ctk.CTkTabview(
             self,
             height=260,
-            fg_color=c.glass_navy,
-            segmented_button_fg_color="#04131E",
-            segmented_button_selected_color=c.glass_cyan,
-            segmented_button_selected_hover_color=c.panel_glass_hover,
-            segmented_button_unselected_color="#04131E",
+            fg_color=c.glass_black,
+            segmented_button_fg_color=c.bg_abyss,
+            segmented_button_selected_color=c.active_amber,
+            segmented_button_selected_hover_color=c.active_amber_hover,
+            segmented_button_unselected_color=c.bg_abyss,
             segmented_button_unselected_hover_color=c.glass_navy,
             text_color=c.text_primary,
         )
@@ -133,10 +157,10 @@ class ModInspector(ctk.CTkFrame):
             actions,
             text="Apply",
             height=40,
-            fg_color=c.glass_cyan if self.on_preview_deployment else c.disabled,
-            hover_color=c.panel_glass_hover if self.on_preview_deployment else c.disabled,
+            fg_color=c.active_amber if self.on_preview_deployment else c.disabled,
+            hover_color=c.active_amber_hover if self.on_preview_deployment else c.disabled,
             border_width=1,
-            border_color=c.shell_border if self.on_preview_deployment else c.border_soft,
+            border_color=c.accent_pressure if self.on_preview_deployment else c.border_soft,
             corner_radius=t.button_radius,
             text_color=c.text_primary if self.on_preview_deployment else c.text_muted,
             font=(t.font_family, t.body, "bold"),
@@ -210,7 +234,7 @@ class ModInspector(ctk.CTkFrame):
             parent,
             values=names,
             fg_color=c.glass_black,
-            button_color=c.glass_cyan,
+            button_color=c.active_amber,
             button_hover_color=c.panel_glass_hover,
             text_color=c.text_primary,
             command=self._config_selected,
@@ -218,7 +242,7 @@ class ModInspector(ctk.CTkFrame):
         menu.pack(fill="x", padx=10, pady=(10, 6))
         self.config_textbox = ctk.CTkTextbox(
             parent,
-            fg_color="#04131E",
+            fg_color=c.bg_abyss,
             text_color=c.text_secondary,
             border_width=1,
             border_color=c.border_soft,
@@ -314,7 +338,7 @@ class ModInspector(ctk.CTkFrame):
         c = t.colors
         box = ctk.CTkTextbox(
             parent,
-            fg_color="#04131E",
+            fg_color=c.bg_abyss,
             text_color=c.text_secondary,
             border_width=1,
             border_color=c.border_soft,

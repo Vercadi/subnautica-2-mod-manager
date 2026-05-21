@@ -68,6 +68,15 @@ def build_deployment_plan(
     for entry in profile.ordered_entries():
         component = components_by_id.get(entry.component_id)
         if component is None:
+            if not entry.enabled:
+                plan.skips.append(
+                    DeploymentSkip(
+                        entry.component_id,
+                        entry.display_name or entry.component_id,
+                        "disabled entry no longer exists in the manager library",
+                    )
+                )
+                continue
             plan.errors.append(f"{entry.display_name or entry.component_id} is missing from the imported library.")
             continue
         if component.component_type == COMPONENT_UE4SS_MOD:
@@ -86,7 +95,7 @@ def build_deployment_plan(
 
     if any(component.component_type == COMPONENT_UE4SS_MOD for component in enabled_components):
         has_profile_runtime = any(
-            component.component_type == COMPONENT_UE4SS_RUNTIME
+            _is_ue4ss_runtime_component(component)
             for component in enabled_components
         )
         if not ue4ss_runtime_installed and not has_profile_runtime:
@@ -469,6 +478,18 @@ def _requires_review_block(component: LibraryComponent) -> bool:
     if component.install_kind == INSTALL_KIND_LOOSE_OVERLAY:
         return True
     return False
+
+
+def _is_ue4ss_runtime_component(component: LibraryComponent) -> bool:
+    if component.component_type == COMPONENT_UE4SS_RUNTIME:
+        return True
+    if component.install_kind == COMPONENT_UE4SS_RUNTIME:
+        return True
+    badges = " ".join(component.badges).casefold()
+    if "ue4ss" in badges and "runtime" in badges:
+        return True
+    name = component.display_name.casefold()
+    return "ue4ss" in name and "runtime" in name
 
 
 def _safe_relative(value: str) -> bool:
