@@ -8,6 +8,7 @@ from ..models.archive_info import COMPONENT_PAK_BUNDLE
 from ..models.library import LibraryComponent, LibrarySource, LibraryState
 from ..utils.hashing import hash_file
 from ..utils.json_io import read_json, write_json
+from .library_duplicates import DuplicateCleanupResult, duplicate_key
 from .pak_targets import pak_component_target_hint, pak_file_target_hint
 
 
@@ -97,6 +98,43 @@ class LibraryStore:
         self.state.components.extend(components)
         self.save()
         return source
+
+    def remove_uninstalled_duplicates_for_sources(
+        self,
+        sources: list[LibrarySource],
+        *,
+        protected_component_ids: set[str] | None = None,
+    ) -> DuplicateCleanupResult:
+        protected = protected_component_ids or set()
+        new_source_ids = {source.source_id for source in sources}
+        if not new_source_ids:
+            return DuplicateCleanupResult([], [])
+        new_components = [
+            component for component in self.state.components
+            if component.source_id in new_source_ids
+        ]
+        if not new_components:
+            return DuplicateCleanupResult([], [])
+
+        removal_ids: list[str] = []
+        protected_ids: list[str] = []
+        for new_component in new_components:
+            key = duplicate_key(new_component)
+            if not key[0]:
+                continue
+            for existing in self.state.components:
+                if existing.component_id == new_component.component_id or existing.source_id in new_source_ids:
+                    continue
+                if duplicate_key(existing) != key:
+                    continue
+                if existing.component_id in protected:
+                    protected_ids.append(existing.component_id)
+                    continue
+                removal_ids.append(existing.component_id)
+
+        unique_removal_ids = list(dict.fromkeys(removal_ids))
+        self.remove_components(unique_removal_ids)
+        return DuplicateCleanupResult(unique_removal_ids, list(dict.fromkeys(protected_ids)))
 
     def save(self) -> None:
         self.library_dir.mkdir(parents=True, exist_ok=True)

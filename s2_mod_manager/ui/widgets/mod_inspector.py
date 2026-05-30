@@ -491,6 +491,8 @@ def _warnings_text(mod: PlaceholderMod) -> str:
             "- Use Enable for selected safe mods.",
             "- Use Apply to sync enabled/disabled profile changes to the game.",
             "- Use Uninstall for manager-installed files you want removed now.",
+            "- Use Delete From List to remove uninstalled imported mods from the available list.",
+            "- Inbox-only rows come from the Mods inbox folder; move/delete the original file if you do not want to import it.",
             "- Review-required loose overlays stay skipped until a safe recipe exists.",
         ]
     )

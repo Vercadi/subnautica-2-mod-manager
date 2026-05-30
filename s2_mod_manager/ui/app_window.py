@@ -29,6 +29,7 @@ from ..core.folder_targets import game_mods_folder_target
 from ..core.gamepass_health import GamePassHealth, build_gamepass_health
 from ..core.help_about import build_help_about_view
 from ..core.library_store import LibraryStore
+from ..core.library_duplicates import duplicate_key
 from ..core.library_workflow import (
     build_library_view_state,
     import_all_candidates,
@@ -285,6 +286,7 @@ class AppWindow(ctk.CTk):
             on_remove_all_profile_entries=self.remove_all_profile_entries,
             on_remove_selected_profile_entries=self.remove_selected_profile_entries,
             on_remove_selected_mods=self.remove_selected_mods_from_list,
+            on_delete_old_versions=self.delete_old_versions,
             on_uninstall_selected_mods=self.uninstall_selected_mods,
             on_reset_to_vanilla=self.reset_to_vanilla,
             on_open_mods_folder=self.open_game_mods_folder,
@@ -379,13 +381,15 @@ class AppWindow(ctk.CTk):
         self._console_write(self._inbox_summary())
         self._record_activity("scan inbox", "completed", target=str(self.app_state.paths.archive_inbox_dir or ""), details=self.library_view.summary.text)
         if self.library_view.summary.candidate_source_count:
-            self._console_write("Inbox candidates are visible in the mod list. Use Install & Enable from the review dialog, or browse/drop for review.")
+            self._console_write("Inbox candidates are visible in the mod list. Select one and use Install & Enable, or open review for anything marked Needs Review.")
+            self._console_write("Inbox-only rows are raw files in the Mods inbox. Move or delete the original file from the inbox if you want it gone before import.")
 
     def import_selected(self, mod: PlaceholderMod) -> None:
         if not mod.source_path:
             self._console_write("Import selected: no source selected.")
             return
         imported = import_selected_candidates(self.library_store, self._visible_inbox_scans(), {mod.source_path})
+        duplicate_message = self._cleanup_replaced_duplicates(imported)
         enable_result = None
         if imported:
             enable_result = enable_imported_sources(
@@ -395,12 +399,15 @@ class AppWindow(ctk.CTk):
             )
         self._refresh_library_view(refresh_diagnostics=True)
         self._console_write(f"Import selected: {len(imported)} source(s) now in manager library. {self.library_view.summary.text}")
+        if duplicate_message:
+            self._console_write(duplicate_message)
         if enable_result is not None:
             self._console_write(enable_result.message)
         self._record_activity("import selected", f"{len(imported)} source(s) + enable", target=mod.name)
 
     def import_all(self) -> None:
         imported = import_all_candidates(self.library_store, self._visible_inbox_scans())
+        duplicate_message = self._cleanup_replaced_duplicates(imported)
         enable_result = None
         if imported:
             enable_result = enable_imported_sources(
@@ -410,6 +417,8 @@ class AppWindow(ctk.CTk):
             )
         self._refresh_library_view(refresh_diagnostics=True)
         self._console_write(f"Import all: {len(imported)} source(s) now in manager library. {self.library_view.summary.text}")
+        if duplicate_message:
+            self._console_write(duplicate_message)
         if enable_result is not None:
             self._console_write(enable_result.message)
         self._record_activity("import all", f"{len(imported)} source(s) + enable", details=self.library_view.summary.text)
@@ -462,6 +471,7 @@ class AppWindow(ctk.CTk):
         for source in imported:
             if source.source_hash:
                 self.hidden_inbox_hashes.discard(source.source_hash)
+        duplicate_message = self._cleanup_replaced_duplicates(imported)
         enable_result = None
         if enable and imported:
             selected_component_ids = {
@@ -478,6 +488,8 @@ class AppWindow(ctk.CTk):
         self.inbox_scans = self._scan_inbox_cached()
         self._refresh_library_view(refresh_diagnostics=True)
         self._console_write(import_review_summary(review, imported_count=len(imported)))
+        if duplicate_message:
+            self._console_write(duplicate_message)
         if enable_result is not None:
             self._console_write(enable_result.message)
         state = f"imported {len(imported)} source(s)"
@@ -744,7 +756,10 @@ class AppWindow(ctk.CTk):
             self._console_write("Import this mod before adding it to a profile.")
             return
         if mod.state.startswith("candidate"):
-            self._console_write("Import this inbox candidate before enabling it.")
+            if mod.review_policy_text:
+                self._console_write(f"Needs review before install: {mod.review_policy_text}")
+                return
+            self.import_selected(mod)
             return
         if mod.review_policy_text:
             self._console_write(f"Needs review before profile enable: {mod.review_policy_text}")
@@ -780,7 +795,10 @@ class AppWindow(ctk.CTk):
             self._console_write("Import this mod before enabling it.")
             return
         if mod.state.startswith("candidate"):
-            self._console_write("Import this inbox candidate before enabling it.")
+            if mod.review_policy_text:
+                self._console_write(f"Needs review before install: {mod.review_policy_text}")
+                return
+            self.import_selected(mod)
             return
         if mod.review_policy_text and not mod.in_active_profile:
             self._console_write(f"Needs review before profile enable: {mod.review_policy_text}")
@@ -893,23 +911,151 @@ class AppWindow(ctk.CTk):
     def remove_selected_mods_from_list(self, component_ids: list[str]) -> None:
         component_ids = list(dict.fromkeys(component_id for component_id in component_ids if component_id))
         if not component_ids:
-            self._console_write("Remove: select one or more mods first.")
+            self._console_write("Delete from list: select one or more imported mods first.")
             return
-        removed_from_profile = self._remove_components_from_active_profile(component_ids)
-        removable_from_library = [
-            component_id
-            for component_id in component_ids
-            if component_id not in self._installed_component_ids()
-        ]
+        library_component_ids = {
+            component.component_id
+            for component in self.library_store.list_components()
+        }
+        selected_library_ids = [component_id for component_id in component_ids if component_id in library_component_ids]
+        if not selected_library_ids:
+            self._console_write(
+                "Delete from list: select imported mods. Inbox-only files are not in the library yet; "
+                "delete or move those files from the Mods inbox folder."
+            )
+            return
+        installed_ids = self._installed_component_ids()
+        installed_selected = [component_id for component_id in selected_library_ids if component_id in installed_ids]
+        removable_from_library = [component_id for component_id in selected_library_ids if component_id not in installed_ids]
+        if not removable_from_library:
+            text = "Delete from list: selected mod(s) are installed. Click Uninstall first, then Delete From List."
+            self._console_write(text)
+            if self.installed_tab is not None:
+                self.installed_tab.set_action_message(text, warning=True)
+            return
+        skipped_text = ""
+        if installed_selected:
+            skipped_text = f" {len(installed_selected)} installed mod(s) will be skipped; uninstall them first."
+        if not confirm_dialog(
+            self,
+            tokens=self.tokens,
+            title="Delete From List",
+            message=(
+                f"Delete {len(removable_from_library)} mod(s) from the available list? "
+                "This removes the manager-owned library copy from AppData and removes those entries from all profiles. "
+                "It does not uninstall anything from the game folder."
+                f"{skipped_text}"
+            ),
+            confirm_text="Delete From List",
+            width=620,
+            height=300,
+        ):
+            self._console_write("Delete from list cancelled.")
+            return
         self.hidden_inbox_hashes.update(self._source_hashes_for_components(removable_from_library))
+        removed_from_profiles = self.profile_store.remove_components_from_all_profiles(removable_from_library)
         removed = self.library_store.remove_components(removable_from_library)
         self._refresh_library_view(refresh_recovery=True, refresh_diagnostics=True)
-        self._console_write(
-            f"Removed {removed_from_profile} profile entr{'y' if removed_from_profile == 1 else 'ies'} "
-            f"and {removed} uninstalled mod(s) from the manager list. "
-            "Installed game files change only when you click Apply or Uninstall."
+        text = (
+            f"Deleted {removed} mod(s) from the available list and removed "
+            f"{removed_from_profiles} profile entr{'y' if removed_from_profiles == 1 else 'ies'}. "
+            "Game files were not changed."
         )
-        self._record_activity("mod list", "removed", details=f"{removed} removed")
+        if installed_selected:
+            text += f" Skipped {len(installed_selected)} installed mod(s); uninstall them first."
+        self._console_write(text)
+        if self.installed_tab is not None:
+            self.installed_tab.set_action_message(text, warning=bool(installed_selected))
+        self._record_activity("mod list", "deleted from list", details=text)
+
+    def delete_old_versions(self, component_id: str) -> None:
+        component = next(
+            (item for item in self.library_store.list_components() if item.component_id == component_id),
+            None,
+        )
+        if component is None:
+            self._console_write("Delete old versions: selected mod is not in the manager library.")
+            return
+        key = duplicate_key(component)
+        installed_ids = self._installed_component_ids()
+        duplicate_ids = [
+            item.component_id
+            for item in self.library_store.list_components()
+            if item.component_id != component.component_id
+            and item.component_id not in installed_ids
+            and duplicate_key(item) == key
+        ]
+        installed_duplicates = [
+            item.component_id
+            for item in self.library_store.list_components()
+            if item.component_id != component.component_id
+            and item.component_id in installed_ids
+            and duplicate_key(item) == key
+        ]
+        if not duplicate_ids:
+            text = "Delete old versions: no uninstalled duplicate entries found for this mod."
+            if installed_duplicates:
+                text += " Installed duplicates are kept until you uninstall them."
+            self._console_write(text)
+            if self.installed_tab is not None:
+                self.installed_tab.set_action_message(text, warning=bool(installed_duplicates))
+            return
+        if not confirm_dialog(
+            self,
+            tokens=self.tokens,
+            title="Delete Old Versions",
+            message=(
+                f"Keep {component.display_name} and delete {len(duplicate_ids)} old duplicate entr"
+                f"{'y' if len(duplicate_ids) == 1 else 'ies'} from the available list? "
+                "This removes only manager-owned library copies and profile references. "
+                "Installed game files are not changed."
+            ),
+            confirm_text="Delete Old Versions",
+            width=620,
+            height=300,
+        ):
+            self._console_write("Delete old versions cancelled.")
+            return
+        self.hidden_inbox_hashes.update(self._source_hashes_for_components(duplicate_ids))
+        removed_from_profiles = self.profile_store.remove_components_from_all_profiles(duplicate_ids)
+        removed = self.library_store.remove_components(duplicate_ids)
+        self._refresh_library_view(refresh_recovery=True, refresh_diagnostics=True)
+        text = (
+            f"Deleted {removed} old duplicate entr{'y' if removed == 1 else 'ies'} from the available list "
+            f"and removed {removed_from_profiles} stale profile reference"
+            f"{'' if removed_from_profiles == 1 else 's'}. Game files were not changed."
+        )
+        if installed_duplicates:
+            text += f" Kept {len(installed_duplicates)} installed duplicate(s); uninstall them first."
+        self._console_write(text)
+        if self.installed_tab is not None:
+            self.installed_tab.set_action_message(text, warning=bool(installed_duplicates))
+        self._record_activity("mod list", "deleted old versions", target=component.display_name, details=text)
+
+    def _cleanup_replaced_duplicates(self, imported_sources) -> str:
+        if not imported_sources:
+            return ""
+        result = self.library_store.remove_uninstalled_duplicates_for_sources(
+            list(imported_sources),
+            protected_component_ids=self._installed_component_ids(),
+        )
+        if not result.removed_component_ids and not result.protected_component_ids:
+            return ""
+        removed_profiles = self.profile_store.remove_components_from_all_profiles(result.removed_component_ids)
+        pieces: list[str] = []
+        if result.removed_component_ids:
+            pieces.append(
+                f"Replaced {len(result.removed_component_ids)} old uninstalled duplicate entr"
+                f"{'y' if len(result.removed_component_ids) == 1 else 'ies'}."
+            )
+        if removed_profiles:
+            pieces.append(f"Removed {removed_profiles} stale profile reference{'' if removed_profiles == 1 else 's'}.")
+        if result.protected_component_ids:
+            pieces.append(
+                f"Kept {len(result.protected_component_ids)} installed duplicate"
+                f"{'' if len(result.protected_component_ids) == 1 else 's'}; uninstall old versions before deleting them."
+            )
+        return " ".join(pieces)
 
     def _remove_components_from_active_profile(self, component_ids: list[str]) -> int:
         active = self.profile_store.active_profile()

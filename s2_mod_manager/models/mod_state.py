@@ -82,6 +82,7 @@ def selection_action_states(
         if bool(getattr(mod, "in_active_profile", False)) and not active_profile_protected
     ]
     any_installed = any(bool(getattr(mod, "installed", False)) for mod in selected)
+    any_library = any(str(getattr(mod, "state", "") or "") == "library" for mod in selected)
 
     return {
         "Apply": SelectionActionState(
@@ -104,6 +105,10 @@ def selection_action_states(
             bool(any_installed),
             _selection_reason(any_selected, False, "Select installed mods to uninstall."),
         ),
+        "Delete From List": SelectionActionState(
+            bool(any_library),
+            _selection_reason(any_selected, False, "Select imported mods to delete from the available list."),
+        ),
         "Reset to Vanilla": SelectionActionState(True, ""),
     }
 
@@ -112,7 +117,7 @@ def _can_enable(mod: Any, *, active_profile_protected: bool) -> bool:
     if _truthy(getattr(mod, "review_policy_text", "")):
         return False
     state = str(getattr(mod, "state", "") or "")
-    if state != "library":
+    if state != "library" and not state.startswith("candidate"):
         return False
     if bool(getattr(mod, "in_active_profile", False)):
         return not bool(getattr(mod, "profile_enabled", False)) and not active_profile_protected

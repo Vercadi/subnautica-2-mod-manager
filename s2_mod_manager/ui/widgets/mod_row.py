@@ -550,7 +550,7 @@ def _row_action_hint(mod: PlaceholderMod, *, can_toggle: bool, profile_protected
     if _is_imported_profile_source(mod):
         return "toggle adds" if can_toggle else "needs review"
     if mod.state.startswith("candidate"):
-        return "import first"
+        return "toggle installs" if can_toggle else "install from inbox"
     return "not ready"
 
 

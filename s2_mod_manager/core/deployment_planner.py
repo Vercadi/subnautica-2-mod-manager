@@ -52,7 +52,7 @@ def build_deployment_plan(
         real_apply_enabled=real_apply_enabled and not dry_run,
     )
     if paths.client_root is None:
-        plan.errors.append("Subnautica 2 install root is not configured.")
+        plan.errors.append("Subnautica 2 install root is not configured. Next: open Settings and select the game folder.")
     elif paths.is_gamepass_experimental:
         plan.warnings.append(
             "Game Pass / WinGDK support is experimental. UE4SS base/runtime files target the Game Pass Content root, while standard Lua mods target WinGDK\\ue4ss\\Mods; review every target before applying."
@@ -77,7 +77,10 @@ def build_deployment_plan(
                     )
                 )
                 continue
-            plan.errors.append(f"{entry.display_name or entry.component_id} is missing from the imported library.")
+            plan.errors.append(
+                f"{entry.display_name or entry.component_id} is missing from the imported library. "
+                "Next: remove it from the profile or reinstall it, then click Apply again."
+            )
             continue
         if component.component_type == COMPONENT_UE4SS_MOD:
             profile_ue4ss_states.append((component, bool(entry.enabled)))
@@ -115,13 +118,19 @@ def _plan_component(
     skip_ue4ss_enabled_txt: bool = False,
 ) -> None:
     if source is None:
-        plan.errors.append(f"{component.display_name} is missing its library source record.")
+        plan.errors.append(
+            f"{component.display_name} is missing its library source record. "
+            "Next: Delete From List and reinstall this mod, or Remove from Profile."
+        )
         return
     if not source.managed_path.exists():
-        plan.errors.append(f"{component.display_name} source copy is missing: {source.managed_path}")
+        plan.errors.append(
+            f"{component.display_name} source copy is missing: {source.managed_path}. "
+            "Next: Delete From List and reinstall this mod, or Remove from Profile."
+        )
         return
     if not component.files:
-        plan.errors.append(f"{component.display_name} has no stored file list; reimport the source before applying.")
+        plan.errors.append(f"{component.display_name} has no stored file list. Next: Delete From List and reinstall this mod.")
         return
 
     review_messages = _review_messages(component)
@@ -152,18 +161,21 @@ def _plan_component(
         if skip_ue4ss_enabled_txt and component.component_type == COMPONENT_UE4SS_MOD and _is_enabled_txt_target(file):
             continue
         if not _safe_relative(file.source_path):
-            plan.errors.append(f"{component.display_name} has unsafe source path: {file.source_path}")
+            plan.errors.append(f"{component.display_name} has unsafe source path: {file.source_path}. Next: do not install this archive; send a support report.")
             continue
         if file.target_hint and not _safe_relative(file.target_hint):
-            plan.errors.append(f"{component.display_name} has unsafe target hint: {file.target_hint}")
+            plan.errors.append(f"{component.display_name} has unsafe target hint: {file.target_hint}. Next: do not install this archive; send a support report.")
             continue
         target = _target_for_file(component, file, paths)
         if target is None:
-            plan.errors.append(f"{component.display_name} has no valid deployment target.")
+            plan.errors.append(f"{component.display_name} has no valid deployment target for {file.source_path}. Next: send a support report with this mod name.")
             continue
         source_missing = _source_member_missing(source.managed_path, file.source_path)
         if source_missing:
-            plan.errors.append(f"{component.display_name} source file is missing: {file.source_path}")
+            plan.errors.append(
+                f"{component.display_name} source file is missing: {file.source_path}. "
+                "Next: Delete From List and reinstall this mod, or Remove from Profile."
+            )
             continue
         plan.actions.append(
             DeploymentFileAction(
@@ -457,6 +469,7 @@ def _detect_target_conflicts(plan: DeploymentPlan) -> None:
                 + str(target)
                 + " is written by "
                 + ", ".join(sorted({action.component_name for action in actions}))
+                + ". Next: disable or Remove from Profile one of those mods, then click Apply again."
             )
 
 

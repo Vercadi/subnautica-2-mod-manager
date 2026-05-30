@@ -65,7 +65,7 @@ def _disabled_reason(plan: DeploymentPlan, *, fake: bool, allow_apply: bool) -> 
         missing_source = _missing_source_guidance(blocking_errors)
         if missing_source:
             return missing_source
-        return "Fix this before install: " + "; ".join(blocking_errors[:3])
+        return "Fix this before install: " + "; ".join(blocking_errors[:3]) + " Use Copy Details if you need support."
     if plan.blocked_actions:
         return (
             "Only review-required items are selected. Manual review is needed for blocked loose overlays; "

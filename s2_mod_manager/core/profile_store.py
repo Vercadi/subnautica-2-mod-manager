@@ -147,6 +147,27 @@ class ProfileStore:
             self.save()
         return changed
 
+    def remove_components_from_all_profiles(self, component_ids: list[str]) -> int:
+        selected = set(component_id for component_id in component_ids if component_id)
+        if not selected:
+            return 0
+        removed = 0
+        changed = False
+        for profile in self.state.profiles:
+            if profile.protected:
+                continue
+            before = len(profile.entries)
+            profile.entries = [entry for entry in profile.entries if entry.component_id not in selected]
+            profile_removed = before - len(profile.entries)
+            if profile_removed:
+                removed += profile_removed
+                self._renumber(profile)
+                profile.touch()
+                changed = True
+        if changed:
+            self.save()
+        return removed
+
     def set_component_enabled(self, profile_id: str, component_id: str, enabled: bool) -> bool:
         profile = self._require_profile(profile_id)
         self._ensure_mutable(profile)

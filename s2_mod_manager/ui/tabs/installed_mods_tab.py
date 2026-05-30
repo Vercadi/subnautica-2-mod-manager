@@ -91,6 +91,7 @@ class InstalledModsTab(ctk.CTkFrame):
         on_remove_all_profile_entries=None,
         on_remove_selected_profile_entries=None,
         on_remove_selected_mods=None,
+        on_delete_old_versions=None,
         on_uninstall_selected_mods=None,
         on_reset_to_vanilla=None,
         on_open_mods_folder=None,
@@ -134,6 +135,7 @@ class InstalledModsTab(ctk.CTkFrame):
         self.on_remove_all_profile_entries = on_remove_all_profile_entries
         self.on_remove_selected_profile_entries = on_remove_selected_profile_entries
         self.on_remove_selected_mods = on_remove_selected_mods
+        self.on_delete_old_versions = on_delete_old_versions
         self.on_uninstall_selected_mods = on_uninstall_selected_mods
         self.on_reset_to_vanilla = on_reset_to_vanilla
         self.on_open_mods_folder = on_open_mods_folder
@@ -454,8 +456,9 @@ class InstalledModsTab(ctk.CTkFrame):
             ("Apply", self._preview_deployment_clicked, True),
             ("Enable", self._enable_selected_clicked, False),
             ("Disable", self._disable_selected_clicked, False),
-            ("Remove", self._remove_selected_clicked, False),
+            ("Remove from Profile", self._remove_selected_clicked, False),
             ("Uninstall", self._uninstall_selected_clicked, False),
+            ("Delete From List", self._delete_from_list_clicked, False),
             ("Reset to Vanilla", self._reset_to_vanilla_clicked, False),
         )
         for index, (text, command, primary) in enumerate(buttons, start=5):
@@ -603,12 +606,15 @@ class InstalledModsTab(ctk.CTkFrame):
             has_apply_callback=self.on_preview_deployment is not None,
         )
         c = self.tokens.colors
+        selected_has_candidate = any(str(getattr(mod, "state", "") or "").startswith("candidate") for mod in selected)
         for name, action_state in states.items():
-            button = self.action_buttons.get(name)
+            button = self.action_buttons.get("Remove from Profile" if name == "Remove" else name)
             if button is None:
                 continue
             primary = name == "Apply"
             enabled = action_state.enabled
+            if name == "Enable":
+                button.configure(text="Install & Enable" if selected_has_candidate else "Enable")
             button.configure(
                 state="normal" if enabled else "disabled",
                 fg_color=c.active_amber if primary and enabled else c.glass_black if enabled else c.disabled,
@@ -744,6 +750,13 @@ class InstalledModsTab(ctk.CTkFrame):
             self.on_remove_selected_profile_entries(component_ids)
             self.selected_bulk_ids.difference_update(_mod_key(mod) for mod in mods)
 
+    def _delete_from_list_clicked(self) -> None:
+        targets = self._bulk_mods() or [self.selected]
+        component_ids = [mod.component_id for mod in targets if mod.component_id]
+        if self.on_remove_selected_mods:
+            self.on_remove_selected_mods(component_ids)
+            self.selected_bulk_ids.difference_update(_mod_key(mod) for mod in targets)
+
     def _uninstall_selected_clicked(self) -> None:
         targets = self._bulk_mods() or [self.selected]
         component_ids = [mod.component_id for mod in targets if mod.component_id]
@@ -783,14 +796,24 @@ class InstalledModsTab(ctk.CTkFrame):
         self.selected = mod
         menu = tk.Menu(self, tearoff=False)
         menu.add_command(
-            label="Enable",
+            label="Install & Enable" if mod.state.startswith("candidate") else "Enable",
             command=lambda: self._add_to_profile_for_mod(mod),
             state="normal" if self._can_add_mod_to_profile(mod) else "disabled",
         )
         menu.add_command(
-            label="Remove",
+            label="Remove from Profile",
             command=lambda: self._remove_from_profile_for_mod(mod),
             state="normal" if mod.in_active_profile and not self.active_profile_protected else "disabled",
+        )
+        menu.add_command(
+            label="Delete From List",
+            command=lambda: self._delete_from_list_for_mod(mod),
+            state="normal" if self._can_delete_from_list(mod) else "disabled",
+        )
+        menu.add_command(
+            label="Delete Old Versions",
+            command=lambda: self._delete_old_versions_for_mod(mod),
+            state="normal" if self._can_delete_from_list(mod) else "disabled",
         )
         menu.add_separator()
         menu.add_command(
@@ -830,7 +853,10 @@ class InstalledModsTab(ctk.CTkFrame):
     def _can_add_mod_to_profile(self, mod: PlaceholderMod) -> bool:
         if mod.in_active_profile or not mod.component_id or mod.review_policy_text:
             return False
-        return mod.state == "library"
+        return mod.state == "library" or mod.state.startswith("candidate")
+
+    def _can_delete_from_list(self, mod: PlaceholderMod) -> bool:
+        return bool(mod.component_id) and mod.state == "library"
 
     def _add_to_profile_for_mod(self, mod: PlaceholderMod) -> None:
         self.selected = mod
@@ -841,6 +867,16 @@ class InstalledModsTab(ctk.CTkFrame):
         self.selected = mod
         if self.on_remove_from_profile:
             self.on_remove_from_profile(mod)
+
+    def _delete_from_list_for_mod(self, mod: PlaceholderMod) -> None:
+        self.selected = mod
+        if self.on_remove_selected_mods and mod.component_id:
+            self.on_remove_selected_mods([mod.component_id])
+
+    def _delete_old_versions_for_mod(self, mod: PlaceholderMod) -> None:
+        self.selected = mod
+        if self.on_delete_old_versions and mod.component_id:
+            self.on_delete_old_versions(mod.component_id)
 
     def _preview_deployment_clicked(self) -> None:
         if self.on_preview_deployment:

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from dataclasses import replace
+
 from ..models.archive_info import (
     COMPONENT_PAK_BUNDLE,
     COMPONENT_UE4SS_MOD,
@@ -8,6 +10,7 @@ from ..models.archive_info import (
 )
 from ..models.library import LibraryComponent, LibrarySource, static_library_warnings
 from ..models.library_view import LibraryDisplayItem, LibraryViewState, ScanSummary
+from .library_duplicates import duplicate_groups, duplicate_warning_text
 from .library_store import LibraryStore
 from .review_policy import review_policy_for_fields
 
@@ -72,10 +75,26 @@ def import_selected_candidates(
 
 def _library_items(store: LibraryStore) -> list[LibraryDisplayItem]:
     sources_by_id = {source.source_id: source for source in store.list_sources()}
+    components = store.list_components()
+    duplicate_counts = {
+        component.component_id: len(group)
+        for group in duplicate_groups(components).values()
+        for component in group
+    }
     items: list[LibraryDisplayItem] = []
-    for component in store.list_components():
+    for component in components:
         source = sources_by_id.get(component.source_id)
-        items.append(_item_from_library_component(component, source))
+        item = _item_from_library_component(component, source)
+        duplicate_count = duplicate_counts.get(component.component_id, 0)
+        if duplicate_count > 1:
+            warning = duplicate_warning_text(duplicate_count)
+            item = replace(
+                item,
+                badges=list(dict.fromkeys(list(item.badges) + ["Duplicate"])),
+                warning="; ".join(dict.fromkeys(value for value in [item.warning, warning] if value)),
+                source_warnings=list(dict.fromkeys(list(item.source_warnings) + [warning])),
+            )
+        items.append(item)
     return sorted(items, key=lambda item: (item.source_name.casefold(), item.display_name.casefold()))
 
 

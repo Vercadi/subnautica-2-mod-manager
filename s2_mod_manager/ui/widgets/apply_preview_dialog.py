@@ -84,6 +84,21 @@ class ApplyPreviewDialog(ctk.CTkToplevel):
             anchor="w",
         )
         self.result_label.grid(row=0, column=0, sticky="ew", padx=(0, 10))
+        column = 1
+        if self.preview.errors or self.preview.warnings:
+            ctk.CTkButton(
+                footer,
+                text="Copy Details",
+                width=120,
+                height=34,
+                fg_color=c.glass_navy,
+                hover_color=c.panel_glass,
+                border_width=1,
+                border_color=c.border_cold,
+                text_color=c.text_secondary,
+                command=self._copy_details,
+            ).grid(row=0, column=column, padx=(0, 8))
+            column += 1
         ctk.CTkButton(
             footer,
             text="Close",
@@ -95,7 +110,8 @@ class ApplyPreviewDialog(ctk.CTkToplevel):
             border_color=c.border_cold,
             text_color=c.text_secondary,
             command=self.destroy,
-        ).grid(row=0, column=1, padx=(0, 8))
+        ).grid(row=0, column=column, padx=(0, 8))
+        column += 1
         self.apply_button = ctk.CTkButton(
             footer,
             text=self.preview.apply_button_text,
@@ -109,7 +125,7 @@ class ApplyPreviewDialog(ctk.CTkToplevel):
             state="normal" if self.preview.allow_apply else "disabled",
             command=self._apply_clicked,
         )
-        self.apply_button.grid(row=0, column=2)
+        self.apply_button.grid(row=0, column=column)
 
     def _summary_grid(self, parent, row: int) -> int:
         t = self.tokens
@@ -232,3 +248,38 @@ class ApplyPreviewDialog(ctk.CTkToplevel):
             self.result_label.configure(text=result)
         if self.apply_button is not None:
             self.apply_button.configure(state="disabled", text="Installed / Recorded", fg_color=self.tokens.colors.disabled)
+
+    def _copy_details(self) -> None:
+        lines = [
+            f"Apply Changes: {self.preview.profile_name}",
+            f"Target: {self.preview.target_root or 'not configured'}",
+            self.preview.summary_text,
+        ]
+        if self.preview.disabled_reason:
+            lines.extend(["", "Next action:", self.preview.disabled_reason])
+        if self.preview.errors:
+            lines.append("")
+            lines.append("Errors:")
+            lines.extend(f"- {message}" for message in self.preview.errors)
+        if self.preview.warnings:
+            lines.append("")
+            lines.append("Warnings:")
+            lines.extend(f"- {message}" for message in self.preview.warnings)
+        if self.preview.skip_items:
+            lines.append("")
+            lines.append("Skipped:")
+            lines.extend(f"- {skip.component_name}: {skip.reason}" for skip in self.preview.skip_items)
+        if self.preview.actions:
+            lines.append("")
+            lines.append("Actions:")
+            for action in self.preview.actions[:80]:
+                lines.append(f"- {action.action}: {action.component_name}: {action.source} -> {action.target}")
+                if action.reason:
+                    lines.append(f"  reason: {action.reason}")
+                for warning in action.warnings:
+                    lines.append(f"  warning: {warning}")
+        text = "\n".join(lines)
+        self.clipboard_clear()
+        self.clipboard_append(text)
+        if self.result_label is not None:
+            self.result_label.configure(text="Copied apply details to clipboard.")

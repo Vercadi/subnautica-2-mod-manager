@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.2.2
+
+Hotfix focused on Nexus feedback around inbox installs, duplicate old versions, mod-list cleanup, and confusing actions.
+
+Changed:
+
+- Inbox mods can now be selected and installed/enabled from the main mod list instead of requiring a separate review-dialog path.
+- The row menu now shows `Install & Enable` for inbox candidates.
+- The side action changes from `Enable` to `Install & Enable` when an inbox candidate is selected.
+- Row helper text now explains that supported inbox candidates can be installed from the list.
+- Review-required loose overlays still stay blocked and cannot be bypassed by the inbox shortcut.
+- Added an explicit `Delete From List` action for uninstalled imported mods. This removes the manager-owned `data/library/sources/src_*` copy and `library_state.json` entry, and removes stale profile references.
+- Renamed the profile-only action to `Remove from Profile` so it is not confused with uninstalling or deleting a library entry.
+- New imports now replace likely duplicate old uninstalled library entries instead of filling the list with multiple versions of the same mod.
+- Duplicate entries that cannot be replaced because they are installed are marked with a `Duplicate` badge and can be cleaned after uninstalling.
+- Added `Delete Old Versions` to the row menu for cleaning older uninstalled duplicate entries while keeping the selected one.
+- Apply/plan errors now include clearer next-action wording for missing sources, target conflicts, unsafe paths, and missing install paths.
+- Apply Preview includes a `Copy Details` action when warnings/errors exist.
+
 ## 0.2.0
 
 Visual polish pass based on the Subnautica 2 in-game PDA screenshots.
